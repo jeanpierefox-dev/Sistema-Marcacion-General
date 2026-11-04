@@ -1,0 +1,60 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isBootstrappedAdmin() {
+      return isSignedIn() && request.auth.token.email == 'jsport.braccini.parella@gmail.com';
+    }
+
+    function isValidAppState(data) {
+      return data.keys().hasAll(['id', 'updatedAt']) &&
+             data.keys().hasOnly(['id', 'updatedAt', 'data']) &&
+             data.id is string && data.id.size() > 0 && data.id.size() <= 64 &&
+             data.updatedAt is string && data.updatedAt.size() > 0 && data.updatedAt.size() <= 64;
+    }
+
+    function isValidTestDoc(data) {
+      return data.keys().hasAll(['status']) &&
+             data.keys().hasOnly(['status', 'timestamp']) &&
+             data.status is string && data.status.size() <= 32;
+    }
+
+    // App state synchronization collection (tournaments, teams, users, liveMatch)
+    match /app_state/{stateId} {
+      // Allows all connected devices (referees, scoreboard TV, viewers, coaches) to read state
+      allow get, list: if true;
+
+      // Allow updates to application state with schema enforcement
+      allow create, update: if isValidId(stateId) && isValidAppState(incoming());
+      allow delete: if isBootstrappedAdmin();
+    }
+
+    // Test probe collection for verifying connection health
+    match /test/{testId} {
+      allow get, list: if true;
+      allow create, update: if isValidId(testId) && isValidTestDoc(incoming());
+      allow delete: if isBootstrappedAdmin();
+    }
+  }
+}

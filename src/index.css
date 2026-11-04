@@ -1,0 +1,95 @@
+@import "tailwindcss";
+
+@theme {
+  --color-corp-bg: #0d1b2a;
+  --color-corp-panel: #1b263b;
+  --color-corp-accent: #3b82f6;
+  --color-corp-accent-hover: #2563eb;
+  --color-corp-secondary: #64748b;
+  --color-court-main: #fb923c;
+  --color-court-out: #3b82f6;
+  --color-vnl-dark: #0b1120;
+  --color-vnl-panel: #151e32;
+  --color-vnl-accent: #3b82f6;
+}
+
+/* Scrollbar personalizado corporativo */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0d1b2a;
+}
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+body {
+  background-color: #0d1b2a;
+}
+
+/* Construction Animations */
+@keyframes slideInLeft {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+@keyframes slideInRight {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+@keyframes scaleY {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+@keyframes emphasisIn {
+  0% { transform: scale(0); opacity: 0; }
+  60% { transform: scale(1.1); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes emphasisOut {
+  0% { transform: scale(1); opacity: 1; }
+  40% { transform: scale(1.1); opacity: 1; }
+  100% { transform: scale(0); opacity: 0; }
+}
+@keyframes drawBoardIn {
+  0% { clip-path: inset(50% 50% 50% 50%); opacity: 0; transform: scale(0.95); }
+  40% { clip-path: inset(50% 0% 50% 0%); opacity: 1; transform: scale(1); }
+  100% { clip-path: inset(0% 0% 0% 0%); opacity: 1; transform: scale(1); }
+}
+@keyframes drawBoardOut {
+  0% { clip-path: inset(0% 0% 0% 0%); opacity: 1; transform: scale(1); }
+  60% { clip-path: inset(50% 0% 50% 0%); opacity: 1; transform: scale(1); }
+  100% { clip-path: inset(50% 50% 50% 50%); opacity: 0; transform: scale(0.95); }
+}
+@keyframes scan {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+@keyframes bounceInLine {
+  0% { transform: translate(-50%, -800%) scale(0.8) rotateX(20deg); }
+  50% { transform: translate(-50%, -20%) scale(1) rotateX(10deg); }
+  100% { transform: translate(-50%, -20%) scale(1.2) rotateX(0deg); }
+}
+@keyframes bounceOutLine {
+  0% { transform: translate(-50%, -800%) scale(0.8) rotateX(20deg); }
+  50% { transform: translate(-50%, -35%) scale(1) rotateX(10deg); }
+  100% { transform: translate(-50%, -35%) scale(1.2) rotateX(0deg); }
+}
+@keyframes shadowScaleIn {
+  0% { transform: translate(-50%, 0) scale(0.5); opacity: 0; }
+  50% { transform: translate(-50%, 0) scale(0.8); opacity: 0.5; }
+  100% { transform: translate(-50%, 0) scale(1); opacity: 0.8; }
+}
+@keyframes shadowScaleOut {
+  0% { transform: translate(-50%, 0) scale(0.5); opacity: 0; }
+  50% { transform: translate(-50%, 0) scale(0.8); opacity: 0.5; }
+  100% { transform: translate(-50%, 0) scale(1); opacity: 0.8; }
+}
+@keyframes ripple {
+  0% { transform: translate(-50%, -50%) scale(0.5) rotateX(60deg); opacity: 0.8; }
+  100% { transform: translate(-50%, -50%) scale(2) rotateX(60deg); opacity: 0; }
+}

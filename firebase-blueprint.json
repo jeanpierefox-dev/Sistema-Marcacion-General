@@ -1,0 +1,54 @@
+{
+  "entities": {
+    "AppState": {
+      "title": "AppState",
+      "description": "Synchronized tournament state entity containing users, teams, tournaments, or live match state",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Identifier of the application state document (users, teams, tournaments, liveMatch)",
+          "maxLength": 64
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO timestamp of the last state update",
+          "maxLength": 64
+        },
+        "data": {
+          "type": "object",
+          "description": "State content container for teams, tournaments, users, or match score"
+        }
+      },
+      "required": ["id", "updatedAt"]
+    },
+    "TestDoc": {
+      "title": "TestDoc",
+      "description": "Validation test document to verify Firestore reachability",
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "description": "Status marker of connectivity test",
+          "maxLength": 32
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "ISO timestamp of the connectivity test",
+          "maxLength": 64
+        }
+      },
+      "required": ["status"]
+    }
+  },
+  "firestore": {
+    "/app_state/{stateId}": {
+      "schema": "AppState",
+      "description": "Real-time synchronized data store for tournaments, teams, users, and live volleyball match state"
+    },
+    "/test/{testId}": {
+      "schema": "TestDoc",
+      "description": "Connection test probe document"
+    }
+  }
+}
