@@ -150,12 +150,12 @@ export const Layout: React.FC<LayoutProps> = ({
       </header>
 
       {/* --- MAIN CONTENT --- */}
-      <main className="flex-grow p-4 md:p-8 max-w-7xl mx-auto w-full relative z-10 pb-24 md:pb-8">
+      <main className="flex-grow p-3 sm:p-6 md:p-8 max-w-7xl mx-auto w-full relative z-10 pb-28 md:pb-8">
         {children}
       </main>
 
       {/* --- MOBILE BOTTOM BAR (iOS Style) --- */}
-      <div className="md:hidden fixed bottom-0 left-0 w-full bg-corp-panel/95 backdrop-blur-xl border-t border-white/5 z-[100] pb-safe-area shadow-[0_-5px_20px_rgba(0,0,0,0.3)]">
+      <div className="md:hidden fixed bottom-0 left-0 w-full bg-corp-panel/95 backdrop-blur-xl border-t border-white/10 z-40 pb-safe-area shadow-[0_-5px_20px_rgba(0,0,0,0.5)]">
           <div className="flex justify-around items-center px-2">
                <NavItem isMobile view="home" label="Inicio" icon={Icons.Home} />
                <NavItem isMobile view="lobby" label="Torneos" icon={Icons.Trophy} />

@@ -13,6 +13,7 @@ import { TopPlayers } from './components/TopPlayers';
 import { TournamentBracket } from './components/TournamentBracket';
 import { ProfileEditor } from './components/ProfileEditor';
 import { StreamGuideModal } from './components/StreamGuideModal';
+import { ImageSelectorModal } from './components/ImageSelectorModal';
 import { 
   Tournament, Team, LiveMatchState, 
   Player, PlayerRole, MatchSet, RequestItem, User, MatchConfig
@@ -82,7 +83,16 @@ export const App: React.FC = () => {
   
   // App Data State
   const [users, setUsers] = useState<User[]>([DEFAULT_ADMIN]);
-  const [registeredTeams, setRegisteredTeams] = useState<Team[]>([]);
+  const [registeredTeams, setRegisteredTeams] = useState<Team[]>(() => {
+    try {
+      const cached = localStorage.getItem('vnl_registered_teams');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return [];
+  });
   
   // Tournament State
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
@@ -145,7 +155,10 @@ export const App: React.FC = () => {
   const [newTeamName, setNewTeamName] = useState('');
   const [newTeamCoach, setNewTeamCoach] = useState('');
   const [newTeamLogo, setNewTeamLogo] = useState('');
+  const [newTeamColor, setNewTeamColor] = useState('#1e3a8a');
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
+  const [showTeamLogoModal, setShowTeamLogoModal] = useState(false);
+  const [showTourneyLogoModal, setShowTourneyLogoModal] = useState(false);
 
   // Auto-Start Countdown State
   const [nextSetCountdown, setNextSetCountdown] = useState<number | null>(null);
@@ -192,11 +205,28 @@ export const App: React.FC = () => {
           }
       });
       const unsubTeams = syncData<any>('teams', (val) => {
+          if (val === null || val === undefined) {
+              const cached = localStorage.getItem('vnl_registered_teams');
+              if (cached) {
+                  try {
+                      const parsed = JSON.parse(cached);
+                      if (Array.isArray(parsed) && parsed.length > 0) {
+                          setRegisteredTeams(parsed);
+                          pushData('teams', parsed).catch(() => {});
+                          return;
+                      }
+                  } catch (e) {}
+              }
+              return;
+          }
           const loaded = normalizeArray<Team>(val).map(team => ({
               ...team,
               players: team.players || []
           }));
           setRegisteredTeams(loaded);
+          try {
+              localStorage.setItem('vnl_registered_teams', JSON.stringify(loaded));
+          } catch (e) {}
       });
       const unsubTourneys = syncData<any>('tournaments', (val) => {
           const loaded = normalizeArray<Tournament>(val).map(t => ({
@@ -260,7 +290,20 @@ export const App: React.FC = () => {
 
   // --- SYNC HELPERS ---
   const updateUsers = (newUsers: User[]) => { setUsers(newUsers); pushData('users', newUsers); };
-  const updateTeams = (newTeams: Team[]) => { setRegisteredTeams(newTeams); pushData('teams', newTeams); };
+  const updateTeams = (newTeamsOrUpdater: Team[] | ((prev: Team[]) => Team[])) => {
+      setRegisteredTeams(prev => {
+          const nextTeams = typeof newTeamsOrUpdater === 'function' ? newTeamsOrUpdater(prev) : newTeamsOrUpdater;
+          try {
+              localStorage.setItem('vnl_registered_teams', JSON.stringify(nextTeams));
+          } catch (e) {
+              console.warn('Could not save teams to localStorage:', e);
+          }
+          pushData('teams', nextTeams).catch(err => {
+              console.error('Failed to sync teams to cloud:', err);
+          });
+          return nextTeams;
+      });
+  };
   const updateTournaments = (newTourneys: Tournament[]) => { setTournaments(newTourneys); pushData('tournaments', newTourneys); };
   const updateLiveMatch = (update: LiveMatchState | null | ((prev: LiveMatchState | null) => LiveMatchState | null)) => {
       setLiveMatch(prev => {
@@ -272,30 +315,43 @@ export const App: React.FC = () => {
   
   const handleAddTeam = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTeamName.trim()) return;
+    const trimmedName = newTeamName.trim();
+    if (!trimmedName) return;
     
     if (editingTeamId) {
-        const updated = registeredTeams.map(t => {
+        updateTeams(prev => prev.map(t => {
             if (t.id === editingTeamId) {
-                return { ...t, name: newTeamName, coachName: newTeamCoach || 'Sin entrenador', logoUrl: newTeamLogo };
+                return { 
+                    ...t, 
+                    name: trimmedName, 
+                    coachName: newTeamCoach.trim() || 'Sin entrenador', 
+                    logoUrl: newTeamLogo || t.logoUrl,
+                    color: newTeamColor || t.color || '#1e3a8a'
+                };
             }
             return t;
-        });
-        updateTeams(updated);
+        }));
         setEditingTeamId(null);
     } else {
         const newTeamId = `t-${Date.now()}`;
         const newTeam: Team = {
           id: newTeamId,
-          name: newTeamName,
-          color: '#1e3a8a',
-          coachName: newTeamCoach || 'Sin entrenador',
-          logoUrl: newTeamLogo,
+          name: trimmedName,
+          color: newTeamColor || '#1e3a8a',
+          coachName: newTeamCoach.trim() || 'Sin entrenador',
+          logoUrl: newTeamLogo || '',
           players: Array.from({ length: 12 }, (_, i) => createEmptyPlayer(`${newTeamId}-p${i+1}`, i + 1, getAssignedRole(i)))
         };
-        updateTeams([...registeredTeams, newTeam]);
+        updateTeams(prev => {
+            const exists = prev.some(t => t.id === newTeam.id);
+            if (exists) return prev.map(t => t.id === newTeam.id ? newTeam : t);
+            return [...prev, newTeam];
+        });
     }
-    setNewTeamName(''); setNewTeamCoach(''); setNewTeamLogo('');
+    setNewTeamName(''); 
+    setNewTeamCoach(''); 
+    setNewTeamLogo('');
+    setNewTeamColor('#1e3a8a');
   };
 
   const handleEditTeam = (team: Team) => {
@@ -304,6 +360,7 @@ export const App: React.FC = () => {
     setNewTeamName(team.name);
     setNewTeamCoach(team.coachName);
     setNewTeamLogo(team.logoUrl || '');
+    setNewTeamColor(team.color || '#1e3a8a');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -312,18 +369,21 @@ export const App: React.FC = () => {
     setNewTeamName('');
     setNewTeamCoach('');
     setNewTeamLogo('');
+    setNewTeamColor('#1e3a8a');
   };
 
   const handleDeleteTeam = (teamId: string) => {
       if (!isAdmin) return;
       if (!confirm("¿Estás seguro de eliminar este equipo?")) return;
-      const updated = registeredTeams.filter(t => t.id !== teamId);
-      updateTeams(updated);
+      updateTeams(prev => prev.filter(t => t.id !== teamId));
   };
 
   const handleSystemReset = async () => {
       if (currentUser?.role !== 'ADMIN') return;
       if (!confirm("⚠️ RESET TOTAL: ¿Borrar todo el sistema?")) return;
+      try {
+          localStorage.removeItem('vnl_registered_teams');
+      } catch (e) {}
       await resetCloudData([DEFAULT_ADMIN]);
       setUsers([DEFAULT_ADMIN]);
       setRegisteredTeams([]);
@@ -337,7 +397,40 @@ export const App: React.FC = () => {
       const file = e.target.files?.[0];
       if (file) {
           const reader = new FileReader();
-          reader.onloadend = () => setter(reader.result as string);
+          reader.onloadend = () => {
+              const rawData = reader.result as string;
+              // Compress image to ensure it does not exceed Firestore's 1MB document limit
+              const img = new Image();
+              img.onload = () => {
+                  const canvas = document.createElement('canvas');
+                  const MAX_SIZE = 256;
+                  let width = img.width;
+                  let height = img.height;
+                  if (width > height) {
+                      if (width > MAX_SIZE) {
+                          height = Math.round((height * MAX_SIZE) / width);
+                          width = MAX_SIZE;
+                      }
+                  } else {
+                      if (height > MAX_SIZE) {
+                          width = Math.round((width * MAX_SIZE) / height);
+                          height = MAX_SIZE;
+                      }
+                  }
+                  canvas.width = width;
+                  canvas.height = height;
+                  const ctx = canvas.getContext('2d');
+                  if (ctx) {
+                      ctx.drawImage(img, 0, 0, width, height);
+                      const compressed = canvas.toDataURL('image/jpeg', 0.7);
+                      setter(compressed);
+                  } else {
+                      setter(rawData);
+                  }
+              };
+              img.onerror = () => setter(rawData);
+              img.src = rawData;
+          };
           reader.readAsDataURL(file);
       }
   };
@@ -698,7 +791,7 @@ export const App: React.FC = () => {
 
       const allHistory = sets.flatMap(s => s.history || []);
       const updatedTeams = registeredTeams.map(team => {
-          const updatedPlayers = team.players.map(player => {
+          const updatedPlayers = (team.players || []).map(player => {
               const playerActions = allHistory.filter(h => h.playerId === player.id);
               const points = playerActions.filter(h => h.type === 'attack' || h.type === 'block' || h.type === 'ace').length;
               const aces = playerActions.filter(h => h.type === 'ace').length;
@@ -1804,75 +1897,232 @@ export const App: React.FC = () => {
                    <h2 className="text-3xl font-black text-white uppercase italic tracking-tighter">Gestión de <span className="text-vnl-accent">Equipos</span></h2>
                </div>
                
-               {/* New Team Form */}
+               {/* Team Form (Add or Edit) */}
                {isAdmin && (
-                   <div className="bg-corp-panel p-6 border border-white/10 rounded-xl relative overflow-hidden">
-                       <h3 className="text-sm font-bold text-vnl-accent uppercase tracking-widest mb-4">Registrar Nuevo Equipo</h3>
-                       <form onSubmit={handleAddTeam} className="flex flex-col md:flex-row gap-4 items-end">
-                           <div className="flex-grow w-full">
-                               <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Nombre del Equipo</label>
-                               <input value={newTeamName} onChange={e => setNewTeamName(e.target.value)} className="w-full p-3 bg-black/40 border border-white/10 rounded text-sm text-white font-bold focus:border-vnl-accent outline-none" placeholder="Ej: Las Águilas" required />
+                   <div className={`p-4 sm:p-6 border rounded-2xl relative overflow-hidden transition-all duration-300 shadow-xl ${
+                       editingTeamId 
+                           ? 'bg-gradient-to-br from-yellow-950/20 via-corp-panel to-corp-panel border-yellow-500/50 shadow-yellow-500/10' 
+                           : 'bg-corp-panel border-white/10'
+                   }`}>
+                       {editingTeamId ? (
+                           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-4 pb-3 border-b border-yellow-500/30">
+                               <div className="flex items-center gap-2">
+                                   <span className="w-7 h-7 rounded-lg bg-yellow-500/20 text-yellow-400 flex items-center justify-center font-bold text-sm">
+                                       ✏️
+                                   </span>
+                                   <div>
+                                       <h3 className="text-sm font-black text-yellow-400 uppercase tracking-widest">
+                                           Modificando Equipo: <span className="text-white">{registeredTeams.find(t => t.id === editingTeamId)?.name || newTeamName}</span>
+                                       </h3>
+                                       <p className="text-[11px] text-slate-400">Edita el nombre, coach, escudo o color y guarda los cambios.</p>
+                                   </div>
+                               </div>
+                               <button
+                                   type="button"
+                                   onClick={cancelEditTeam}
+                                   className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white text-xs font-bold uppercase tracking-wider transition"
+                               >
+                                   ✕ Cancelar edición
+                               </button>
                            </div>
-                           <div className="w-full md:w-1/3">
-                               <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Entrenador</label>
-                               <input value={newTeamCoach} onChange={e => setNewTeamCoach(e.target.value)} className="w-full p-3 bg-black/40 border border-white/10 rounded text-sm text-white font-bold focus:border-vnl-accent outline-none" placeholder="Nombre del Coach" />
-                           </div>
-                           <div className="w-full md:w-auto shrink-0">
-                               <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Logo URL (Opcional)</label>
-                               <div className="flex gap-2">
-                                   <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, setNewTeamLogo)} className="hidden" id="teamLogoUpload" />
-                                   <label htmlFor="teamLogoUpload" className="bg-white/10 hover:bg-white/20 text-white px-4 py-3 rounded cursor-pointer border border-white/10 text-xs font-bold uppercase transition">Subir</label>
-                                   {newTeamLogo && <img src={newTeamLogo} className="w-10 h-10 object-contain bg-white rounded p-1" />}
+                       ) : (
+                           <div className="flex items-center gap-2 mb-4 pb-3 border-b border-white/5">
+                               <span className="w-7 h-7 rounded-lg bg-vnl-accent/20 text-vnl-accent flex items-center justify-center font-bold text-sm">
+                                   +
+                               </span>
+                               <div>
+                                   <h3 className="text-sm font-black text-vnl-accent uppercase tracking-widest">Registrar Nuevo Equipo</h3>
+                                   <p className="text-[11px] text-slate-400">Agrega clubes o selecciones con su escudo y plantilla oficial de 12 jugadores.</p>
                                </div>
                            </div>
-                           <div className="flex gap-2 w-full md:w-auto mt-4 md:mt-0">
-                               <button type="submit" className="w-full bg-vnl-accent hover:bg-cyan-400 text-black font-black px-8 py-3 rounded shadow-[0_0_15px_rgba(6,182,212,0.3)] transition uppercase text-xs tracking-widest shrink-0">
-                                   {editingTeamId ? 'Guardar' : 'Agregar'}
-                               </button>
-                               {editingTeamId && (
-                                   <button type="button" onClick={cancelEditTeam} className="w-full bg-slate-600 hover:bg-slate-500 text-white font-black px-8 py-3 rounded transition uppercase text-xs tracking-widest shrink-0">
-                                       Cancelar
+                       )}
+
+                       <form onSubmit={handleAddTeam} className="space-y-4">
+                           <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+                               
+                               {/* Team Name */}
+                               <div className="md:col-span-4">
+                                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                                       Nombre del Equipo *
+                                   </label>
+                                   <input 
+                                       type="text"
+                                       value={newTeamName} 
+                                       onChange={e => setNewTeamName(e.target.value)} 
+                                       className="w-full p-3 bg-black/40 border border-white/15 rounded-xl text-sm text-white font-bold focus:border-vnl-accent outline-none min-h-[46px]" 
+                                       placeholder="Ej: Águilas del Vóley" 
+                                       required 
+                                   />
+                               </div>
+
+                               {/* Coach Name */}
+                               <div className="md:col-span-3">
+                                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                                       Director Técnico / Coach
+                                   </label>
+                                   <input 
+                                       type="text"
+                                       value={newTeamCoach} 
+                                       onChange={e => setNewTeamCoach(e.target.value)} 
+                                       className="w-full p-3 bg-black/40 border border-white/15 rounded-xl text-sm text-white font-bold focus:border-vnl-accent outline-none min-h-[46px]" 
+                                       placeholder="Ej: Marcelo Méndez" 
+                                   />
+                               </div>
+
+                               {/* Logo / Image Picker Button */}
+                               <div className="md:col-span-3">
+                                   <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                                       Escudo / Logo del Club
+                                   </label>
+                                   <div className="flex items-center gap-2">
+                                       <button
+                                           type="button"
+                                           onClick={() => setShowTeamLogoModal(true)}
+                                           className="flex-grow p-2.5 bg-white/5 hover:bg-white/10 border border-white/15 hover:border-vnl-accent rounded-xl text-left flex items-center gap-3 transition min-h-[46px] group"
+                                       >
+                                           <div className="w-8 h-8 rounded-lg bg-black/40 border border-white/10 flex items-center justify-center shrink-0 overflow-hidden">
+                                               {newTeamLogo ? (
+                                                   <img src={newTeamLogo} alt="Logo" className="w-full h-full object-contain" />
+                                               ) : (
+                                                   <span className="text-base">🛡️</span>
+                                               )}
+                                           </div>
+                                           <div className="min-w-0 flex-grow">
+                                               <span className="text-xs font-bold text-white block truncate">
+                                                   {newTeamLogo ? 'Cambiar Escudo' : 'Elegir Escudo'}
+                                               </span>
+                                               <span className="text-[10px] text-vnl-accent font-semibold block">Galería / Subir</span>
+                                           </div>
+                                       </button>
+                                       {newTeamLogo && (
+                                           <button
+                                               type="button"
+                                               onClick={() => setNewTeamLogo('')}
+                                               className="w-9 h-9 rounded-xl bg-red-500/20 text-red-400 hover:text-white hover:bg-red-500/40 flex items-center justify-center shrink-0 text-sm font-bold transition"
+                                               title="Quitar escudo"
+                                           >
+                                               ✕
+                                           </button>
+                                       )}
+                                   </div>
+                               </div>
+
+                               {/* Action Buttons */}
+                               <div className="md:col-span-2 flex flex-col sm:flex-row md:flex-col gap-2">
+                                   <button 
+                                       type="submit" 
+                                       className={`w-full py-3 px-5 rounded-xl font-black text-xs uppercase tracking-wider transition min-h-[46px] shadow-lg flex items-center justify-center gap-2 active:scale-95 ${
+                                           editingTeamId
+                                               ? 'bg-yellow-400 hover:bg-yellow-300 text-black shadow-yellow-400/20'
+                                               : 'bg-vnl-accent hover:bg-cyan-400 text-black shadow-cyan-400/20'
+                                       }`}
+                                   >
+                                       <span>{editingTeamId ? '✓' : '+'}</span>
+                                       <span>{editingTeamId ? 'Guardar' : 'Agregar'}</span>
                                    </button>
-                               )}
+                                   {editingTeamId && (
+                                       <button 
+                                           type="button" 
+                                           onClick={cancelEditTeam} 
+                                           className="w-full py-3 px-4 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs uppercase tracking-wider transition min-h-[46px] flex items-center justify-center"
+                                       >
+                                           Cancelar
+                                       </button>
+                                   )}
+                               </div>
+
                            </div>
                        </form>
                    </div>
                )}
 
                {/* Teams List */}
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                    {registeredTeams.map(team => (
-                       <div key={team.id} className="bg-corp-panel border border-white/10 rounded-xl overflow-hidden group hover:border-vnl-accent/30 transition">
-                           <div className="p-4 bg-gradient-to-r from-blue-900/20 to-transparent flex justify-between items-center border-b border-white/5">
-                               <div className="flex items-center gap-3">
-                                   {team.logoUrl ? <img src={team.logoUrl} className="w-10 h-10 object-contain drop-shadow" /> : <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center font-bold">{team.name[0]}</div>}
-                                   <div>
-                                       <h3 className="font-black text-white text-lg uppercase italic tracking-tight">{team.name}</h3>
-                                       <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Coach: {team.coachName}</p>
+                       <div key={team.id} className="bg-corp-panel border border-white/10 rounded-2xl overflow-hidden group hover:border-vnl-accent/40 transition-all duration-200 shadow-lg flex flex-col">
+                           {/* Team Header */}
+                           <div className="p-4 sm:p-5 bg-gradient-to-r from-blue-950/40 via-corp-panel to-transparent flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/5">
+                               <div className="flex items-center gap-3.5 min-w-0">
+                                   <div className="w-12 h-12 rounded-xl bg-black/40 border border-white/10 flex items-center justify-center overflow-hidden shrink-0 shadow-md">
+                                       {team.logoUrl ? (
+                                           <img src={team.logoUrl} alt={team.name} className="w-full h-full object-contain p-1 drop-shadow" />
+                                       ) : (
+                                           <div className="w-full h-full flex items-center justify-center font-black text-white text-lg bg-gradient-to-br from-blue-600 to-indigo-800">
+                                               {team.name?.[0] || 'E'}
+                                           </div>
+                                       )}
+                                   </div>
+                                   <div className="min-w-0 flex-grow">
+                                       <h3 className="font-black text-white text-lg sm:text-xl uppercase italic tracking-tight truncate">
+                                           {team.name || 'Sin nombre'}
+                                       </h3>
+                                       <div className="flex items-center gap-2 mt-0.5">
+                                           <span className="text-[11px] font-bold text-slate-400 tracking-wider">
+                                               DT: {team.coachName || 'Sin entrenador'}
+                                           </span>
+                                           <span className="text-slate-600">·</span>
+                                           <span className="text-[11px] font-mono text-cyan-400 font-semibold">
+                                               {(team.players || []).length} Jugadores
+                                           </span>
+                                       </div>
                                    </div>
                                </div>
+
                                {isAdmin && (
-                                   <div className="flex gap-2">
-                                       <button onClick={() => handleEditTeam(team)} className="text-yellow-500 hover:text-yellow-400 font-bold text-xs uppercase">Modificar</button>
-                                       <button onClick={() => handleDeleteTeam(team.id)} className="text-red-500 hover:text-red-400 font-bold text-xs uppercase">Eliminar</button>
+                                   <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                                       <button 
+                                           onClick={() => handleEditTeam(team)} 
+                                           className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-yellow-500/15 hover:bg-yellow-500/30 border border-yellow-500/40 text-yellow-300 hover:text-yellow-200 font-bold text-xs uppercase tracking-wider transition active:scale-95 min-h-[40px]"
+                                           title="Modificar nombre, DT o escudo"
+                                       >
+                                           <span>✏️</span>
+                                           <span>Modificar</span>
+                                       </button>
+                                       <button 
+                                           onClick={() => handleDeleteTeam(team.id)} 
+                                           className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-red-500/15 hover:bg-red-500/30 border border-red-500/40 text-red-300 hover:text-red-200 font-bold text-xs uppercase tracking-wider transition active:scale-95 min-h-[40px]"
+                                           title="Eliminar equipo"
+                                       >
+                                           <span>🗑️</span>
+                                           <span>Eliminar</span>
+                                       </button>
                                    </div>
                                )}
                            </div>
                            
-                           {/* Players */}
-                           <div className="p-4 grid grid-cols-4 gap-2">
-                               {team.players.map(p => (
-                                   <div 
-                                     key={p.id} 
-                                     onClick={() => setEditingPlayer(p)}
-                                     className="bg-black/30 p-2 rounded border border-white/5 flex flex-col items-center cursor-pointer hover:bg-white/10 transition group/player"
-                                   >
-                                       <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-xs font-bold text-white mb-1 overflow-hidden">
-                                           {p.profile?.photoUrl ? <img src={p.profile.photoUrl} className="w-full h-full object-cover" /> : `#${p.number}`}
+                           {/* Players Grid */}
+                           <div className="p-4 sm:p-5 flex-grow space-y-3">
+                               <div className="flex items-center justify-between text-[11px] text-slate-400 font-semibold uppercase tracking-wider">
+                                   <span>Plantilla Oficial</span>
+                                   <span className="text-vnl-accent text-[10px]">Toca un jugador para editar</span>
+                               </div>
+                               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+                                   {(team.players || []).map(p => (
+                                       <div 
+                                         key={p.id} 
+                                         onClick={() => setEditingPlayer(p)}
+                                         className="bg-black/30 hover:bg-white/10 p-2.5 rounded-xl border border-white/5 hover:border-vnl-accent/50 flex flex-col items-center cursor-pointer transition-all duration-150 group/player relative"
+                                         title={`Toca para editar ficha de ${p.name}`}
+                                       >
+                                           <div className="w-9 h-9 rounded-full bg-slate-800 flex items-center justify-center text-xs font-black text-white mb-1.5 overflow-hidden border border-white/10 group-hover/player:border-vnl-accent">
+                                               {p.profile?.photoUrl ? (
+                                                   <img src={p.profile.photoUrl} alt={p.name} className="w-full h-full object-cover" />
+                                               ) : (
+                                                   `#${p.number}`
+                                               )}
+                                           </div>
+                                           <span className="text-[10px] font-bold text-slate-300 uppercase truncate w-full text-center group-hover/player:text-white">
+                                               {(p.name || `Jugador ${p.number}`).split(' ')[0]}
+                                           </span>
+                                           <span className="text-[9px] font-semibold text-slate-500 truncate w-full text-center">
+                                               {p.role || 'Jugador'}
+                                           </span>
+                                           {p.isCaptain && (
+                                               <span className="absolute top-1 right-1 text-[10px]" title="Capitán">⭐</span>
+                                           )}
                                        </div>
-                                       <span className="text-[9px] font-bold text-slate-400 uppercase truncate w-full text-center group-hover/player:text-white">{p.name.split(' ')[0]}</span>
-                                   </div>
-                               ))}
+                                   ))}
+                               </div>
                            </div>
                        </div>
                    ))}
@@ -2022,8 +2272,8 @@ export const App: React.FC = () => {
       
       {/* MVP Selection Modal */}
       {showMvpModal && liveMatch && activeTournament && (
-          <div className="fixed inset-0 bg-black/95 z-[60] flex items-center justify-center p-4 backdrop-blur-md">
-              <div className="bg-vnl-panel border border-white/20 p-6 w-full max-w-4xl shadow-[0_0_50px_rgba(255,215,0,0.2)] max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 bg-black/95 z-[120] flex items-center justify-center p-3 sm:p-6 backdrop-blur-md overflow-y-auto">
+              <div className="bg-vnl-panel border border-white/20 p-5 sm:p-6 w-full max-w-4xl shadow-[0_0_50px_rgba(255,215,0,0.2)] rounded-2xl max-h-[92vh] overflow-y-auto">
                   <h3 className="text-3xl font-black text-yellow-400 uppercase italic tracking-tighter mb-2 text-center">🌟 Elegir MVP del Partido 🌟</h3>
                   <p className="text-center text-slate-400 text-sm mb-8 uppercase tracking-widest">Selecciona al jugador más valioso para finalizar el encuentro</p>
                   
@@ -2089,8 +2339,8 @@ export const App: React.FC = () => {
 
       {/* Edit Tournament Modal */}
       {showEditTourneyModal && (
-          <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 backdrop-blur-md">
-              <div className="bg-vnl-panel border border-white/20 p-6 w-full max-w-lg shadow-[0_0_50px_rgba(6,182,212,0.2)]">
+          <div className="fixed inset-0 bg-black/90 z-[120] flex items-center justify-center p-3 sm:p-6 backdrop-blur-md overflow-y-auto">
+              <div className="bg-vnl-panel border border-white/20 p-5 sm:p-6 w-full max-w-lg shadow-[0_0_50px_rgba(6,182,212,0.2)] rounded-2xl max-h-[92vh] overflow-y-auto">
                   <h3 className="text-xl font-black text-white uppercase italic tracking-tighter mb-6 border-b border-white/10 pb-2">Editar Torneo</h3>
                   <div className="space-y-4">
                       <div>
@@ -2139,10 +2389,10 @@ export const App: React.FC = () => {
                           ⚠️ Advertencia: Cambiar el formato o las fechas regenerará todo el fixture y borrará los resultados existentes.
                       </div>
 
-                      <button onClick={handleUpdateTournament} disabled={loading} className="w-full bg-vnl-accent hover:bg-cyan-400 text-black font-black py-4 uppercase tracking-widest text-sm shadow-lg transition mt-4 flex items-center justify-center gap-2">
+                      <button onClick={handleUpdateTournament} disabled={loading} className="w-full bg-vnl-accent hover:bg-cyan-400 text-black font-black py-3.5 rounded-xl uppercase tracking-widest text-xs shadow-lg transition mt-4 flex items-center justify-center gap-2 min-h-[44px]">
                           {loading ? 'Actualizando...' : 'Guardar Cambios'}
                       </button>
-                      <button onClick={() => setShowEditTourneyModal(false)} className="w-full text-slate-500 text-xs font-bold uppercase tracking-widest hover:text-white transition">Cancelar</button>
+                      <button onClick={() => setShowEditTourneyModal(false)} className="w-full text-slate-400 text-xs font-bold uppercase tracking-widest hover:text-white transition py-2.5">Cancelar</button>
                   </div>
               </div>
           </div>
@@ -2150,8 +2400,8 @@ export const App: React.FC = () => {
 
       {/* Create Tournament Modal */}
       {showCreateTourneyModal && (
-          <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 backdrop-blur-md">
-              <div className="bg-vnl-panel border border-white/20 p-6 w-full max-w-lg shadow-[0_0_50px_rgba(6,182,212,0.2)]">
+          <div className="fixed inset-0 bg-black/90 z-[120] flex items-center justify-center p-3 sm:p-6 backdrop-blur-md overflow-y-auto">
+              <div className="bg-vnl-panel border border-white/20 p-5 sm:p-6 w-full max-w-lg shadow-[0_0_50px_rgba(6,182,212,0.2)] rounded-2xl max-h-[92vh] overflow-y-auto">
                   <h3 className="text-xl font-black text-white uppercase italic tracking-tighter mb-6 border-b border-white/10 pb-2">Nuevo Torneo</h3>
                   <div className="space-y-4">
                       <div>
@@ -2162,28 +2412,25 @@ export const App: React.FC = () => {
                       {/* LOGO UPLOAD SECTION */}
                       <div>
                           <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Logo del Torneo (Opcional)</label>
-                          <div className="flex gap-4 items-center">
-                              <label 
-                                  htmlFor="tourney-logo-upload" 
-                                  className="flex-1 bg-black/40 hover:bg-white/5 border border-white/10 border-dashed rounded p-4 flex flex-col items-center justify-center cursor-pointer transition group"
+                          <div className="flex gap-2 items-center">
+                              <button
+                                  type="button"
+                                  onClick={() => setShowTourneyLogoModal(true)}
+                                  className="flex-1 bg-black/40 hover:bg-white/5 border border-white/15 hover:border-vnl-accent rounded-xl p-3 flex items-center justify-center gap-2 transition group min-h-[46px]"
                               >
-                                  <span className="text-2xl mb-2 group-hover:scale-110 transition">📸</span>
-                                  <span className="text-[10px] font-bold text-slate-400 uppercase group-hover:text-white">Click para subir</span>
-                                  <input 
-                                      id="tourney-logo-upload" 
-                                      type="file" 
-                                      accept="image/*" 
-                                      className="hidden" 
-                                      onChange={(e) => handleFileUpload(e, (val) => setNewTourneyData(prev => ({...prev, logoUrl: val})))} 
-                                  />
-                              </label>
+                                  <span className="text-xl">🏆</span>
+                                  <span className="text-xs font-bold text-slate-300 group-hover:text-white uppercase tracking-wider">
+                                      {newTourneyData.logoUrl ? 'Cambiar Logo' : 'Galería / Subir Logo'}
+                                  </span>
+                              </button>
                               
                               {newTourneyData.logoUrl && (
-                                  <div className="w-20 h-20 bg-black/40 rounded border border-white/10 flex items-center justify-center p-2 relative group">
+                                  <div className="w-14 h-14 bg-black/40 rounded-xl border border-white/10 flex items-center justify-center p-1 relative shrink-0">
                                       <img src={newTourneyData.logoUrl} className="max-w-full max-h-full object-contain" />
                                       <button 
                                           onClick={() => setNewTourneyData(prev => ({...prev, logoUrl: ''}))}
-                                          className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold shadow-sm opacity-0 group-hover:opacity-100 transition"
+                                          className="absolute -top-1 -right-1 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold shadow-sm"
+                                          title="Quitar logo"
                                       >
                                           ✕
                                       </button>
@@ -2271,32 +2518,32 @@ export const App: React.FC = () => {
 
       {/* Match Config Modal (Pre-Match or Edit Rules) */}
       {showMatchConfigModal && activeTournament && (
-          <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 backdrop-blur-md">
-              <div className="bg-vnl-panel border border-white/20 p-6 w-full max-w-md shadow-2xl">
+          <div className="fixed inset-0 bg-black/90 z-[120] flex items-center justify-center p-3 sm:p-6 backdrop-blur-md overflow-y-auto">
+              <div className="bg-vnl-panel border border-white/20 p-5 sm:p-6 w-full max-w-md shadow-2xl rounded-2xl max-h-[92vh] overflow-y-auto">
                   <h3 className="text-xl font-black text-white uppercase italic tracking-tighter mb-4">{isEditingRules ? 'Editar Reglas' : 'Configurar Partido'}</h3>
                   <div className="space-y-4">
                       <div>
                           <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Sets Máximos</label>
-                          <div className="flex gap-2 bg-black/40 p-1 rounded border border-white/10">
+                          <div className="flex gap-2 bg-black/40 p-1 rounded-xl border border-white/10">
                               {[1, 3, 5].map(n => (
-                                  <button key={n} onClick={() => setMatchConfig({...matchConfig, maxSets: n})} className={`flex-1 py-2 text-xs font-bold uppercase rounded transition ${matchConfig.maxSets === n ? 'bg-vnl-accent text-black shadow' : 'text-slate-400 hover:text-white'}`}>{n} Sets</button>
+                                  <button key={n} onClick={() => setMatchConfig({...matchConfig, maxSets: n})} className={`flex-1 py-2.5 text-xs font-bold uppercase rounded-lg transition min-h-[40px] ${matchConfig.maxSets === n ? 'bg-vnl-accent text-black shadow' : 'text-slate-400 hover:text-white'}`}>{n} Sets</button>
                               ))}
                           </div>
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                           <div>
                               <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Puntos por Set</label>
-                              <input type="number" value={matchConfig.pointsPerSet} onChange={e => setMatchConfig({...matchConfig, pointsPerSet: parseInt(e.target.value)})} className="w-full p-2 bg-black/40 border border-white/10 text-white font-bold text-center" />
+                              <input type="number" value={matchConfig.pointsPerSet} onChange={e => setMatchConfig({...matchConfig, pointsPerSet: parseInt(e.target.value)})} className="w-full p-3 bg-black/40 border border-white/10 rounded-xl text-white font-bold text-center" />
                           </div>
                           <div>
                               <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Tie Break</label>
-                              <input type="number" value={matchConfig.tieBreakPoints} onChange={e => setMatchConfig({...matchConfig, tieBreakPoints: parseInt(e.target.value)})} className="w-full p-2 bg-black/40 border border-white/10 text-white font-bold text-center" />
+                              <input type="number" value={matchConfig.tieBreakPoints} onChange={e => setMatchConfig({...matchConfig, tieBreakPoints: parseInt(e.target.value)})} className="w-full p-3 bg-black/40 border border-white/10 rounded-xl text-white font-bold text-center" />
                           </div>
                       </div>
-                      <button onClick={handleSaveConfig} className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-3 uppercase tracking-widest text-sm shadow-lg transition mt-2">
+                      <button onClick={handleSaveConfig} className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-3.5 rounded-xl uppercase tracking-widest text-xs shadow-lg transition mt-2 min-h-[44px]">
                           {isEditingRules ? 'Guardar Cambios' : 'CONFIRMAR INICIO'}
                       </button>
-                      <button onClick={() => setShowMatchConfigModal(null)} className="w-full text-slate-500 text-xs font-bold uppercase tracking-widest hover:text-white transition">Cancelar</button>
+                      <button onClick={() => setShowMatchConfigModal(null)} className="w-full text-slate-400 text-xs font-bold uppercase tracking-widest hover:text-white transition py-2.5">Cancelar</button>
                   </div>
               </div>
           </div>
@@ -2304,8 +2551,8 @@ export const App: React.FC = () => {
 
       {/* Substitution Modal */}
       {showSubModal && liveMatch && activeTournament && (
-          <div className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4 backdrop-blur-sm">
-              <div className="bg-vnl-panel border border-white/20 p-6 w-full max-w-sm shadow-2xl">
+          <div className="fixed inset-0 bg-black/80 z-[120] flex items-center justify-center p-3 sm:p-6 backdrop-blur-sm overflow-y-auto">
+              <div className="bg-vnl-panel border border-white/20 p-5 sm:p-6 w-full max-w-sm shadow-2xl rounded-2xl max-h-[92vh] overflow-y-auto">
                   <h3 className="text-lg font-black text-white uppercase italic tracking-tighter mb-4 text-center">Realizar Cambio</h3>
                   <div className="flex items-center justify-center gap-4 mb-6">
                        <div className="text-center">
@@ -2340,13 +2587,13 @@ export const App: React.FC = () => {
       
       {/* Rotation Editor Modal */}
       {showRotationModal && liveMatch && (
-          <div className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4 backdrop-blur-sm">
-              <div className="bg-vnl-panel border border-white/20 p-6 w-full max-w-md shadow-2xl">
+          <div className="fixed inset-0 bg-black/85 z-[120] flex items-center justify-center p-3 sm:p-6 backdrop-blur-md overflow-y-auto">
+              <div className="bg-vnl-panel border border-white/20 p-5 sm:p-6 w-full max-w-md shadow-2xl rounded-2xl max-h-[92vh] overflow-y-auto">
                    <h3 className="text-lg font-black text-white uppercase italic tracking-tighter mb-4 text-center">Editar Rotación (P1 - P6)</h3>
-                   <div className="grid grid-cols-3 gap-2 mb-6">
+                   <div className="grid grid-cols-3 gap-2.5 mb-6">
                        {[0, 1, 2, 3, 4, 5].map(i => (
                            <div key={i} className="text-center">
-                               <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Pos {i+1}</label>
+                               <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Pos {i+1}</label>
                                <input 
                                  type="number"
                                  value={rotationInput[i] || ''}
@@ -2355,14 +2602,14 @@ export const App: React.FC = () => {
                                      newRot[i] = e.target.value;
                                      setRotationInput(newRot);
                                  }}
-                                 className="w-full p-2 bg-black/40 border border-white/10 text-white font-bold text-center focus:border-vnl-accent outline-none"
+                                 className="w-full p-2.5 bg-black/40 border border-white/15 rounded-xl text-white font-bold text-center focus:border-vnl-accent outline-none text-base"
                                />
                            </div>
                        ))}
                    </div>
                    <div className="flex gap-2">
-                      <button onClick={() => setShowRotationModal(null)} className="flex-1 bg-white/10 hover:bg-white/20 text-white py-3 rounded text-xs font-bold uppercase">Cancelar</button>
-                      <button onClick={handleUpdateRotation} className="flex-1 bg-vnl-accent hover:bg-cyan-400 text-black py-3 rounded text-xs font-black uppercase shadow-[0_0_15px_rgba(6,182,212,0.3)]">Actualizar</button>
+                      <button onClick={() => setShowRotationModal(null)} className="flex-1 bg-white/10 hover:bg-white/20 text-white py-3 rounded-xl text-xs font-bold uppercase min-h-[44px]">Cancelar</button>
+                      <button onClick={handleUpdateRotation} className="flex-1 bg-vnl-accent hover:bg-cyan-400 text-black py-3 rounded-xl text-xs font-black uppercase shadow-[0_0_15px_rgba(6,182,212,0.3)] min-h-[44px]">Actualizar</button>
                    </div>
               </div>
           </div>
@@ -2375,18 +2622,15 @@ export const App: React.FC = () => {
             currentUser={currentUser}
             onClose={() => setEditingPlayer(null)}
             onSave={(updated) => {
-                // Determine which team this player belongs to
-                // We must update registeredTeams state
-                const newTeams = registeredTeams.map(t => {
-                    const pIndex = t.players.findIndex(p => p.id === updated.id);
+                updateTeams(prev => prev.map(t => {
+                    const pIndex = (t.players || []).findIndex(p => p.id === updated.id);
                     if (pIndex !== -1) {
                         const newPlayers = [...t.players];
                         newPlayers[pIndex] = updated;
                         return { ...t, players: newPlayers };
                     }
                     return t;
-                });
-                updateTeams(newTeams);
+                }));
                 setEditingPlayer(null);
             }}
           />
@@ -2424,6 +2668,26 @@ export const App: React.FC = () => {
         isOpen={showStreamGuide} 
         onClose={() => setShowStreamGuide(false)} 
         matchUrl={window.location.href} 
+      />
+
+      {/* TEAM LOGO IMAGE PICKER MODAL */}
+      <ImageSelectorModal
+        isOpen={showTeamLogoModal}
+        title="Escudo / Logo del Club"
+        currentImage={newTeamLogo}
+        targetType="team"
+        onSelectImage={(url) => setNewTeamLogo(url)}
+        onClose={() => setShowTeamLogoModal(false)}
+      />
+
+      {/* TOURNAMENT LOGO IMAGE PICKER MODAL */}
+      <ImageSelectorModal
+        isOpen={showTourneyLogoModal}
+        title="Logo Oficial del Torneo"
+        currentImage={newTourneyData.logoUrl}
+        targetType="team"
+        onSelectImage={(url) => setNewTourneyData(prev => ({ ...prev, logoUrl: url }))}
+        onClose={() => setShowTourneyLogoModal(false)}
       />
 
     </Layout>
