@@ -17,6 +17,7 @@ interface ScoreControlProps {
   teamId: string;
   teamName: string;
   players: Player[]; 
+  rotation?: (Player | null)[]; // Active 6 players on court
   disabled: boolean;
   timeoutsUsed: number;
   subsUsed: number;
@@ -37,6 +38,7 @@ export const ScoreControl: React.FC<ScoreControlProps> = ({
   teamId,
   teamName,
   players,
+  rotation,
   disabled,
   timeoutsUsed,
   subsUsed,
@@ -52,29 +54,41 @@ export const ScoreControl: React.FC<ScoreControlProps> = ({
 
   // --- REFEREE VIEW (Rotation List Only) ---
   if (isReferee) {
+      // Usar la rotación real de 6 jugadores en cancha (P1 a P6), no el plantel completo de 12
+      const activeRotation: (Player | null)[] = (rotation && Array.isArray(rotation) && rotation.length > 0)
+        ? rotation
+        : (players.slice(0, 6) as (Player | null)[]);
+
       return (
-          <div className={`bg-black/40 backdrop-blur p-4 rounded-xl border ${isServing ? 'border-yellow-500/50 shadow-[0_0_15px_rgba(234,179,8,0.1)]' : 'border-white/10'} h-full flex flex-col`}>
+          <div className={`bg-slate-900/90 backdrop-blur p-4 rounded-2xl border ${isServing ? 'border-yellow-500/60 shadow-[0_0_20px_rgba(234,179,8,0.2)]' : 'border-white/10'} h-full flex flex-col`}>
               <div className="flex justify-between items-center border-b border-white/10 pb-3 mb-3">
-                  <h3 className={`font-black text-lg uppercase tracking-wider ${isServing ? 'text-yellow-400' : 'text-white'}`}>{teamName}</h3>
+                  <div>
+                    <h3 className={`font-black text-lg uppercase tracking-wider ${isServing ? 'text-yellow-400' : 'text-white'}`}>{teamName}</h3>
+                    <span className="text-[10px] text-slate-400 uppercase font-mono">Alineación en Cancha</span>
+                  </div>
                   <div className="flex items-center gap-2">
-                      {isServing && <span className="text-[10px] font-bold bg-yellow-500 text-black px-2 py-0.5 rounded uppercase">Saque</span>}
+                      {isServing && <span className="text-[10px] font-black bg-yellow-400 text-slate-950 px-2 py-0.5 rounded uppercase flex items-center gap-1 shadow-sm"><span>🏐</span> Saque</span>}
                       {onToggleRotationView && (
                           <button 
                               onClick={onToggleRotationView}
-                              className={`w-8 h-8 rounded-full flex items-center justify-center border transition-all ${showRotationView ? 'bg-blue-500 border-blue-400 text-white shadow-[0_0_10px_blue]' : 'bg-black/40 border-white/10 text-slate-500 hover:text-white'}`}
-                              title="Mostrar/Ocultar Gráfico de Rotación en Pantalla Completa"
+                              className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase flex items-center gap-1.5 transition-all border ${
+                                showRotationView 
+                                  ? 'bg-cyan-500 border-cyan-300 text-slate-950 shadow-[0_0_12px_rgba(6,182,212,0.4)]' 
+                                  : 'bg-slate-800 hover:bg-slate-700 border-white/10 text-slate-300'
+                              }`}
+                              title="Abrir Tablero Táctico Separado"
                           >
-                              <span className="text-xs font-black">R</span>
+                              <span>📋</span> Ver Tablero
                           </button>
                       )}
                   </div>
               </div>
               
-              <div className="flex-grow space-y-2 overflow-y-auto">
+              <div className="flex-grow space-y-3 overflow-y-auto">
                   {/* Visual Court rotation view for Floor Referee */}
-                  <div className="my-2 p-1 rounded bg-black/20 border border-white/5">
+                  <div className="my-1 rounded-xl overflow-hidden border border-white/10 shadow-inner">
                       <Court 
-                          players={players} 
+                          players={activeRotation} 
                           serving={isServing}
                           teamName={teamName}
                           variant="referee"
@@ -83,28 +97,52 @@ export const ScoreControl: React.FC<ScoreControlProps> = ({
                   </div>
                   
                   {/* Standard Rotation Display P1-P6 */}
-                  <div className="grid grid-cols-2 gap-1 mt-2">
-                      {players.map((p, i) => {
-                          const pos = i + 1; // P1, P2...
-                          const isServer = pos === 1 && isServing;
-                          return (
-                              <div 
-                                key={p.id || i} 
-                                className={`flex flex-col items-center p-1 rounded border transition-colors ${isServer ? 'bg-yellow-500/20 border-yellow-500/50' : 'bg-white/5 border-white/5'}`}
-                              >
-                                  <div className="flex items-center gap-1">
-                                      <span className={`text-[10px] font-black ${isServer ? 'text-yellow-400' : 'text-slate-500'}`}>P{pos}</span>
-                                      <span className={`font-mono font-bold text-xs ${p.name === 'Libero' ? 'text-yellow-200' : 'text-white'}`}>#{p.number}</span>
-                                  </div>
-                                  <span className="text-[9px] font-bold text-slate-300 uppercase truncate max-w-[80px]">{p.name.split(' ')[0]}</span>
-                              </div>
-                          );
-                      })}
+                  <div>
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                      Sexteto en Cancha (Posiciones 1 a 6):
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                        {[1, 2, 3, 4, 5, 6].map((pos) => {
+                            const p = activeRotation[pos - 1];
+                            const isServer = pos === 1 && isServing;
+                            return (
+                                <div 
+                                  key={pos} 
+                                  className={`flex flex-col items-center p-1.5 rounded-xl border transition-all ${
+                                    isServer 
+                                      ? 'bg-yellow-500/25 border-yellow-400 shadow-[0_0_10px_rgba(250,204,21,0.2)]' 
+                                      : 'bg-slate-800/60 border-white/5'
+                                  }`}
+                                >
+                                    <div className="flex items-center gap-1.5 w-full justify-between px-1">
+                                        <span className={`text-[10px] font-mono font-black ${isServer ? 'text-yellow-400' : 'text-slate-400'}`}>P{pos}</span>
+                                        {isServer && <span className="text-[8px] bg-yellow-400 text-slate-950 px-1 rounded font-black">SAQUE</span>}
+                                        {p && (
+                                          <span className={`font-mono font-black text-xs ${p.role?.toLowerCase().includes('libero') ? 'text-amber-300' : 'text-cyan-300'}`}>
+                                            #{p.number}
+                                          </span>
+                                        )}
+                                    </div>
+                                    <span className="text-[10px] font-bold text-white uppercase truncate max-w-[100px] mt-0.5">
+                                      {p ? p.name : <span className="text-slate-500 italic">Sin Asignar</span>}
+                                    </span>
+                                </div>
+                            );
+                        })}
+                    </div>
                   </div>
               </div>
               
-              <div className="mt-4 pt-3 border-t border-white/10 text-center">
-                  <p className="text-[9px] text-slate-500 uppercase font-bold tracking-widest">Verificación de Rotación</p>
+              <div className="mt-3 pt-2.5 border-t border-white/10 flex items-center justify-between">
+                  <p className="text-[9px] text-slate-400 uppercase font-bold tracking-widest">Planilla de Rotación Oficial</p>
+                  {onToggleRotationView && (
+                    <button 
+                      onClick={onToggleRotationView}
+                      className="text-[10px] font-bold text-cyan-400 hover:text-cyan-300 uppercase tracking-wider"
+                    >
+                      Ampliar Pantalla ↗
+                    </button>
+                  )}
               </div>
           </div>
       );
@@ -137,7 +175,7 @@ export const ScoreControl: React.FC<ScoreControlProps> = ({
               </button>
             )}
             
-            {/* Rotation View Toggle (Admin) */}
+            {/* Rotation View Toggle (Admin / Main Referee) */}
             {(role === 'ADMIN' || role === 'MAIN_REFEREE') && onToggleRotationView && (
                 <button 
                     onClick={onToggleRotationView}

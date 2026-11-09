@@ -129,6 +129,7 @@ export interface LiveMatchState {
   showRotation?: boolean;  // Sync TV state
   statsSetIndex?: number;  // If defined, show stats for this set index (0-based). If undefined, show match total.
   adminPeerId?: string;    // PeerJS ID for live streaming
+  varChallenge?: VarChallengeState;
   tvSettings?: {
     style: 'horizontal' | 'vertical';
     triggerInLogoTransition?: number;
@@ -151,6 +152,23 @@ export interface LiveMatchState {
     showWinPrediction?: boolean;
     showReceiverAccuracy?: boolean;
   };
+}
+
+export interface VarChallengeState {
+  isActive: boolean;
+  requestingTeamId?: string;
+  requestingTeamName?: string;
+  challengeType: 'attack_touch' | 'net_touch' | 'in_out' | 'serve_foot' | 'general';
+  challengeLabel: string;
+  cameraAngle: 'attack' | 'serve' | 'halcon' | 'crowd' | 'wireless';
+  cameraLabel?: string;
+  assignedWirelessPeerId?: string;
+  replayDataUrl?: string;
+  verdict?: 'IN_PROGRESS' | 'BALL_IN' | 'BALL_OUT' | 'TOUCH_NET' | 'TOUCH_BLOCK' | 'CONFIRMED' | 'OVERTURNED' | null;
+  slowMoSpeed: number;
+  replayFrameIndex?: number;
+  simulatedIn?: boolean;
+  updatedAt?: number;
 }
 
 export interface RequestItem {

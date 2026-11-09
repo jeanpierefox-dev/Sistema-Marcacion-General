@@ -1,6 +1,8 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Peer } from 'peerjs';
+import { QRCodeSVG } from 'qrcode.react';
+import { PEER_CONFIG, getVarPeerId, getVarDirectUrl } from '../constants/peerConfig';
 import { LiveMatchState, Team, Tournament, User } from '../types';
 import { ScoreControl } from './ScoreControl';
 import { RotationView } from './RotationView';
@@ -129,6 +131,7 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
   const [replayTypeLabel, setReplayTypeLabel] = useState<string>('DESAFÍO VAR');
   const [wirelessCams, setWirelessCams] = useState<{ id: string; label: string; stream: MediaStream }[]>([]);
   const [showQRModal, setShowQRModal] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
 
   const varPeerRef = useRef<Peer | null>(null);
   const replayCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -331,60 +334,49 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
   useEffect(() => {
     if (isViewer) return;
 
-    const varPeerId = `${match.matchId}-var`;
+    const varPeerId = getVarPeerId(match.matchId);
     console.log("Iniciando Receptor PeerJS para VAR en ID:", varPeerId);
     
-    const peer = new Peer(varPeerId);
-    varPeerRef.current = peer;
+    let peer: Peer | null = null;
+    try {
+      peer = new Peer(varPeerId, PEER_CONFIG);
+      varPeerRef.current = peer;
 
-    peer.on('open', (id) => {
-      console.log('Receptor VAR abierto en ID:', id);
-    });
+      peer.on('open', (id) => {
+        console.log('Receptor VAR abierto y listo en ID:', id);
+      });
 
-    peer.on('call', (call) => {
-      console.log('Llamada entrante de cámara inalámbrica:', call.peer, call.metadata);
-      call.answer(new MediaStream());
+      peer.on('call', (call) => {
+        console.log('Llamada entrante de cámara inalámbrica:', call.peer, call.metadata);
+        call.answer(new MediaStream());
 
-      call.on('stream', (remoteStream) => {
-        console.log('Señal de video activa recibida para:', call.peer);
-        const camLabel = call.metadata?.label || `Cámara Inalámbrica ${call.peer.substring(0, 4)}`;
-        
-        setWirelessCams(prev => {
-          const filtered = prev.filter(c => c.id !== call.peer);
-          return [...filtered, { id: call.peer, label: camLabel, stream: remoteStream }];
+        call.on('stream', (remoteStream) => {
+          console.log('Señal de video activa recibida para:', call.peer);
+          const camLabel = call.metadata?.label || `Cámara Inalámbrica ${call.peer.substring(0, 4)}`;
+          
+          setWirelessCams(prev => {
+            const filtered = prev.filter(c => c.id !== call.peer);
+            return [...filtered, { id: call.peer, label: camLabel, stream: remoteStream }];
+          });
+        });
+
+        call.on('close', () => {
+          console.log('Llamada de cámara cerrada:', call.peer);
+          setWirelessCams(prev => prev.filter(c => c.id !== call.peer));
+        });
+
+        call.on('error', (err) => {
+          console.error('Error de canal de cámara:', err);
+          setWirelessCams(prev => prev.filter(c => c.id !== call.peer));
         });
       });
 
-      call.on('close', () => {
-        console.log('Llamada de cámara cerrada:', call.peer);
-        setWirelessCams(prev => prev.filter(c => c.id !== call.peer));
+      peer.on('error', (err: any) => {
+        console.warn("Aviso en receptor PeerJS:", err?.type || err);
       });
-
-      call.on('error', (err) => {
-        console.error('Error de canal de cámara:', err);
-        setWirelessCams(prev => prev.filter(c => c.id !== call.peer));
-      });
-    });
-
-    peer.on('error', (err) => {
-      console.error("Error en receptor PeerJS:", err);
-      if (err.type === 'unavailable-id') {
-         console.warn("ID predecible ya ocupado, reintentando con ID aleatorio...");
-         try { peer.destroy(); } catch(e){}
-         const fallbackPeer = new Peer();
-         varPeerRef.current = fallbackPeer;
-         fallbackPeer.on('call', (call) => {
-            call.answer(new MediaStream());
-            call.on('stream', (remoteStream) => {
-              const camLabel = call.metadata?.label || `Cámara Inalámbrica ${call.peer.substring(0, 4)}`;
-              setWirelessCams(prev => {
-                const filtered = prev.filter(c => c.id !== call.peer);
-                return [...filtered, { id: call.peer, label: camLabel, stream: remoteStream }];
-              });
-            });
-         });
-      }
-    });
+    } catch (e) {
+      console.error("Error al crear instancia PeerJS:", e);
+    }
 
     return () => {
       if (peer) {
@@ -931,6 +923,158 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
         ))}
       </div>
 
+      {/* --- OFFICIAL VNL CHALLENGER / VAR BROADCAST DISPLAY --- */}
+      {match.varChallenge?.isActive && (() => {
+        const ch = match.varChallenge!;
+        const requestingTeam = ch.requestingTeamId === teamB.id ? teamB : teamA;
+        
+        return (
+          <div className="absolute inset-0 w-full h-full z-[85] flex flex-col items-center justify-between bg-black/90 backdrop-blur-md animate-in fade-in duration-300 pointer-events-auto p-4 md:p-8">
+            {/* Top Bar with Tournament Logo and Challenge Header */}
+            <div className="w-full max-w-6xl flex items-center justify-between bg-gradient-to-r from-slate-950/95 via-[#0c162c]/95 to-slate-950/95 border border-cyan-500/40 rounded-2xl p-4 md:p-6 shadow-2xl">
+              <div className="flex items-center gap-4">
+                {tournament?.logoUrl ? (
+                  <img src={tournament.logoUrl} alt="Torneo" className="h-12 md:h-16 object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.4)]" />
+                ) : (
+                  <div className="w-12 h-12 rounded-xl bg-cyan-600/30 border border-cyan-400/40 flex items-center justify-center text-cyan-300 font-black text-xl">
+                    VAR
+                  </div>
+                )}
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-red-600 animate-ping"></span>
+                    <span className="bg-red-600 text-white font-black text-[10px] md:text-xs px-2.5 py-0.5 rounded uppercase tracking-widest">
+                      DESAFÍO VAR EN VIVO
+                    </span>
+                    <span className="text-cyan-400 font-mono text-xs font-bold uppercase tracking-wider">
+                      VNL CHALLENGE SYSTEM
+                    </span>
+                  </div>
+                  <h1 className="text-2xl md:text-4xl font-black text-white uppercase italic tracking-wider mt-1 drop-shadow-md">
+                    {ch.challengeLabel || 'REVISIÓN DE JUGADA'}
+                  </h1>
+                </div>
+              </div>
+
+              {/* Requesting Team Badge */}
+              <div className="flex items-center gap-3 bg-black/60 border border-white/10 rounded-2xl p-2.5 px-4 shadow-inner">
+                {requestingTeam.logoUrl && (
+                  <img src={requestingTeam.logoUrl} alt={requestingTeam.name} className="w-10 h-10 object-contain" />
+                )}
+                <div className="text-right">
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block">
+                    SOLICITADO POR
+                  </span>
+                  <span className="text-sm md:text-lg font-black text-white uppercase truncate">
+                    {requestingTeam.name}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Center Content: Dynamic Camera / Replay Frame / Hawk Eye simulation */}
+            <div className="relative w-full max-w-5xl flex-1 my-4 flex items-center justify-center rounded-3xl overflow-hidden border-2 border-white/20 bg-slate-950 shadow-[0_0_50px_rgba(0,0,0,0.9)]">
+              {ch.replayDataUrl ? (
+                <div className="relative w-full h-full flex items-center justify-center bg-black">
+                  <img src={ch.replayDataUrl} alt="Revisión VAR" className="w-full h-full object-contain" />
+                  <div className="absolute top-4 left-4 flex flex-col gap-1.5 z-20">
+                    <div className="bg-red-600/95 text-white font-mono font-black text-xs px-3 py-1.5 rounded-xl uppercase tracking-wider shadow-lg flex items-center gap-2 border border-red-400">
+                      <span className="w-2.5 h-2.5 rounded-full bg-white animate-pulse"></span>
+                      REPETICIÓN EN CÁMARA LENTA {Math.round((ch.slowMoSpeed || 0.25) * 100)}%
+                    </div>
+                    <div className="bg-black/80 backdrop-blur text-cyan-300 font-mono font-bold text-xs px-3 py-1 rounded-lg border border-cyan-500/30 uppercase flex items-center gap-1.5">
+                      <span>📹</span> CÁMARA: {ch.cameraLabel || ch.cameraAngle.toUpperCase()}
+                    </div>
+                  </div>
+                  <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(0,0,0,0.4)_100%)]"></div>
+                </div>
+              ) : ch.cameraAngle === 'halcon' ? (
+                <div className="relative w-full h-full flex flex-col items-center justify-center bg-gradient-to-b from-[#0a1936] to-[#040915] p-6">
+                  {/* High Tech Court Line */}
+                  <div className="relative w-full max-w-3xl h-64 border-b-8 border-white flex flex-col items-center justify-end">
+                    <div className="absolute inset-0 bg-blue-900/10 pointer-events-none"></div>
+                    
+                    {/* Ripple on impact */}
+                    <div className={`absolute bottom-0 w-32 h-12 border-4 rounded-full animate-ping ${ch.simulatedIn !== false ? 'border-green-400 bg-green-500/20' : 'border-red-500 bg-red-500/20'}`}></div>
+                    
+                    {/* Volleyball impact */}
+                    <div className="relative -mb-4 w-20 h-20 rounded-full bg-gradient-to-br from-yellow-300 via-yellow-500 to-blue-700 border-2 border-white shadow-[0_0_25px_rgba(250,204,21,0.6)] flex items-center justify-center">
+                      <span className="text-[10px] font-black text-slate-950 uppercase font-mono">240 FPS</span>
+                    </div>
+                  </div>
+
+                  {/* Impact Distance Metric */}
+                  <div className="mt-8 flex items-center gap-3">
+                    <div className={`px-6 py-2 rounded-2xl font-black text-lg md:text-2xl uppercase tracking-widest border-2 shadow-2xl ${
+                      ch.simulatedIn !== false 
+                        ? 'bg-green-600/30 border-green-400 text-green-300 shadow-[0_0_30px_rgba(34,197,94,0.4)]' 
+                        : 'bg-red-600/30 border-red-400 text-red-300 shadow-[0_0_30px_rgba(239,68,68,0.4)]'
+                    }`}>
+                      {ch.simulatedIn !== false ? '🟢 IN: BALÓN DENTRO (+12 mm)' : '🔴 OUT: BALÓN FUERA (-18 mm)'}
+                    </div>
+                  </div>
+                </div>
+              ) : ch.cameraAngle === 'wireless' && wirelessCams.length > 0 ? (
+                <div className="relative w-full h-full flex items-center justify-center bg-black">
+                  <video 
+                    autoPlay 
+                    playsInline 
+                    muted 
+                    ref={el => { if (el && el.srcObject !== wirelessCams[0].stream) el.srcObject = wirelessCams[0].stream; }}
+                    className="w-full h-full object-contain"
+                  />
+                  <div className="absolute top-4 left-4 bg-red-600/90 text-white font-mono font-black text-xs px-3 py-1 rounded uppercase tracking-wider">
+                    CÁMARA INALÁMBRICA MÓVIL EN VIVO
+                  </div>
+                </div>
+              ) : (
+                <div className="relative w-full h-full flex flex-col items-center justify-center bg-gradient-to-b from-[#0a1124] to-[#04060c] p-6 text-center">
+                  <div className="text-4xl mb-2">📹</div>
+                  <h3 className="text-xl md:text-2xl font-black text-white uppercase tracking-wider">
+                    REPETICIÓN EN CÁMARA LENTA {Math.round((ch.slowMoSpeed || 0.25) * 100)}%
+                  </h3>
+                  <p className="text-slate-400 text-xs md:text-sm max-w-md mt-1 font-mono">
+                    ÁNGULO: {ch.cameraAngle === 'attack' ? 'RED Y BLOQUEO' : ch.cameraAngle === 'serve' ? 'LÍNEA DE SAQUE' : 'PLANO GENERAL'}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Bottom Verdict Banner */}
+            <div className="w-full max-w-4xl flex items-center justify-between bg-slate-950/95 border border-white/20 rounded-2xl p-4 md:p-5 shadow-2xl">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">
+                  {ch.verdict === 'BALL_IN' ? '🟢' : ch.verdict === 'BALL_OUT' ? '🔴' : ch.verdict === 'CONFIRMED' ? '✅' : ch.verdict === 'TOUCH_NET' ? '🏐' : ch.verdict === 'OVERTURNED' ? '❌' : '⏳'}
+                </span>
+                <div>
+                  <span className="text-[9px] font-mono text-slate-400 uppercase tracking-widest block">
+                    DECISIÓN ARBITRAL
+                  </span>
+                  <h3 className="text-lg md:text-2xl font-black text-white uppercase tracking-wide">
+                    {ch.verdict === 'BALL_IN' ? 'BALÓN DENTRO (IN) - PUNTO ASIGNADO' :
+                     ch.verdict === 'BALL_OUT' ? 'BALÓN FUERA (OUT) - PUNTO ASIGNADO' :
+                     ch.verdict === 'CONFIRMED' ? 'DECISIÓN ORIGINAL CONFIRMADA' :
+                     ch.verdict === 'TOUCH_NET' ? 'INFRACCIÓN: TOQUE DE RED' :
+                     ch.verdict === 'TOUCH_BLOCK' ? 'INFRACCIÓN: TOQUE DE BLOQUEO' :
+                     ch.verdict === 'OVERTURNED' ? 'DECISIÓN ARBITRAL REVOCADA' :
+                     'REVISIÓN EN PROCESO POR LA MESA DE CONTROL...'}
+                  </h3>
+                </div>
+              </div>
+
+              {onUpdateMatch && (
+                <button
+                  onClick={() => onUpdateMatch({ varChallenge: { ...ch, isActive: false } })}
+                  className="bg-red-600 hover:bg-red-500 text-white font-black text-xs px-4 py-2 rounded-xl uppercase tracking-wider transition cursor-pointer"
+                >
+                  ✕ Cerrar
+                </button>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* --- BROADCAST SLOW-MOTION REPLAY DISPLAY (TV MODE / OBS) --- */}
       {replayActive && (
         <div className="absolute inset-0 w-full h-full z-[30] flex flex-col items-center justify-center bg-black animate-in fade-in duration-300">
@@ -1151,6 +1295,8 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
             rotationA={match.rotationA} 
             rotationB={match.rotationB} 
             isVertical={isVertical} 
+            servingTeamId={match.servingTeamId}
+            onClose={() => onUpdateMatch?.({ showRotation: false })}
           />
       )}
 
@@ -2300,338 +2446,317 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
           </div>
       ) : (
           /* --- SCOREBOARD (RESPONSIVE VERTICAL/HORIZONTAL) --- */
-          renderScoreboard && !isPreMatch && !activeShowRotation && (
-            <div className={`relative z-10 transition-all duration-300
-                ${isVertical 
-                    ? 'absolute top-0 left-0 h-full w-40 md:w-48 flex items-center justify-center pointer-events-none' 
-                    : 'absolute bottom-5 md:bottom-9 left-1/2 -translate-x-1/2 w-full max-w-[1040px] px-3 md:px-6 pointer-events-none scale-95 md:scale-105 lg:scale-115 flex justify-center origin-bottom'
-                }
-            `}
-            style={(boardAnim === 'in' || boardAnim === 'out') ? {
-                animation: boardAnim === 'in' 
-                    ? 'drawBoardIn 0.8s cubic-bezier(0.8, 0, 0.2, 1) forwards' 
-                    : 'drawBoardOut 0.8s cubic-bezier(0.8, 0, 0.2, 1) forwards'
-            } : {}}
-            >
+          renderScoreboard && !isPreMatch && !activeShowRotation && (() => {
+            const isSelectedTeamA = activeTvSettings?.showTeamStats === teamA.id;
+            const isSelectedTeamB = activeTvSettings?.showTeamStats === teamB.id;
+            const activeStatTeam = isSelectedTeamA ? teamA : isSelectedTeamB ? teamB : null;
+            const isLeftTeamActive = (isSelectedTeamA && !swapSides) || (isSelectedTeamB && swapSides);
+            const isRightTeamActive = (isSelectedTeamB && !swapSides) || (isSelectedTeamA && swapSides);
+
+            const activeTeamQuickStats = activeStatTeam ? (() => {
+                const history = match.sets.flatMap(s => s.history || []).filter(h => h.teamId === activeStatTeam.id);
+                const totalPts = match.sets.reduce((sum, s) => {
+                    return sum + (activeStatTeam.id === teamA.id ? s.scoreA : s.scoreB);
+                }, 0) + (activeStatTeam.id === teamA.id ? match.scoreA : match.scoreB);
+
+                const attacks = history.filter(h => h.type === 'attack').length;
+                const oppErrors = match.sets.flatMap(s => s.history || []).filter(h => h.teamId !== activeStatTeam.id && h.type === 'opponent_error').length;
+                const attackTot = attacks + oppErrors;
+                const attackPct = attackTot > 0 ? Math.round((attacks / attackTot) * 100) : 0;
                 
-                <div className={`bg-transparent rounded-none overflow-visible flex flex-col items-center pointer-events-auto shrink-0 relative
-                    ${isVertical 
-                        ? 'rotate-90 origin-center w-[58vh] max-w-none h-14 md:h-16 shadow-[0_25px_50px_rgba(0,0,0,0.85)]' 
-                        : 'w-full h-14 md:h-16 shadow-[0_25px_50px_rgba(0,0,0,0.85)]'
-                    }
-                `}>
-                    {/* Top Tab for Tournament Name */}
-                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 bg-gradient-to-r from-slate-950/95 via-[#0b1022]/95 to-slate-950/95 rounded-t-xl px-5 md:px-10 py-1 md:py-1.5 flex items-center gap-2.5 text-white font-black text-[10px] md:text-xs tracking-[0.25em] shadow-2xl border-t border-x border-white/15">
-                       <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse shadow-[0_0_8px_#ef4444]"></div>
-                       <span className="truncate max-w-[200px] md:max-w-[400px]">{tournament?.name || "LIGA PROFESIONAL"}</span>
-                       <span className="text-white/30 text-[9px]">|</span>
-                       <span className="text-cyan-400 text-[9px] md:text-[10px] font-bold">SET {match.currentSet}</span>
-                    </div>
-                    
-                    {/* Set Point / Match Point Banner */}
-                    {pointBanner && (
-                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-7 z-50 pointer-events-none flex flex-col items-center justify-center animate-in slide-in-from-bottom-5 duration-500">
-                             <div className="bg-gradient-to-t from-black/95 to-black/75 backdrop-blur-md px-12 md:px-24 py-3 md:py-5 rounded-t-[1.5rem] border-t-4 border-x border-white/20 shadow-[0_-20px_50px_rgba(0,0,0,0.7)]" style={{ borderTopColor: pointBanner.color }}>
-                                 <h1 className="text-4xl md:text-6xl font-black text-white italic uppercase tracking-[0.15em] drop-shadow-lg" style={{ color: pointBanner.color }}>
-                                     {pointBanner.text}
-                                 </h1>
-                                 <div className="mt-1 flex justify-center">
-                                     <div className="text-white/90 font-bold uppercase tracking-[0.2em] text-xs md:text-sm bg-white/10 px-4 py-1 rounded-full border border-white/10">
-                                         {pointBanner.text === 'MATCH POINT' ? 'PUNTO DE PARTIDO' : 'PUNTO DE SET'}
-                                     </div>
-                                 </div>
-                             </div>
-                        </div>
-                    )}
+                const blocks = history.filter(h => h.type === 'block').length;
+                const aces = history.filter(h => h.type === 'ace').length;
 
-                    {/* Left Attachment (Team A Stats) */}
-                    {(activeTvSettings?.showTeamStats === teamA.id || activeTvSettings?.showPlayerStats || (activeTvSettings?.featuredPlayerMode === 'stats' && teamA.players.some(p => p.id === activeTvSettings?.featuredPlayerId))) && !isVertical && (
-                        <div className="absolute top-1/2 -translate-y-1/2 right-[100%] pr-2 h-[85%] flex animate-in slide-in-from-right fade-in pointer-events-none">
-                             <div className="h-full bg-gradient-to-r from-transparent via-[#141b33] to-[#181d2e] rounded-l-2xl border-y border-l border-white/10 shadow-2xl flex items-center pr-4 pl-8 gap-3">
-                                  <div className="flex flex-col items-end">
-                                      <span className="text-[7px] md:text-[9px] font-black text-white/50 uppercase tracking-[0.2em] leading-none">
-                                          {activeTvSettings?.showTeamStats === teamA.id ? 'Ataque Efectividad' : (activeTvSettings?.featuredPlayerMode === 'stats' ? 'Destacado' : 'Top Anotador')}
-                                      </span>
-                                      <span className="text-[10px] md:text-sm font-black text-cyan-400 uppercase tracking-widest leading-none mt-1">
-                                          {activeTvSettings?.showTeamStats === teamA.id ? 'Equipo A' : (()=>{
-                                              if (activeTvSettings?.featuredPlayerMode === 'stats') {
-                                                  const fp = teamA.players.find(p=>p.id===activeTvSettings?.featuredPlayerId);
-                                                  return fp ? `#${fp.number} ${fp.name.split(' ')[0]}` : '';
-                                              }
-                                              let bestPlayer = 'NINGUNO'; let maxPts = 0;
-                                              const scores: Record<string, number> = {};
-                                              match.sets.flatMap(s=>s.history).filter(h=>h.teamId===teamA.id && ['attack','block','ace'].includes(h.type)).forEach(h => {
-                                                  if(h.playerId) { scores[h.playerId] = (scores[h.playerId] || 0) + 1; }
-                                              });
-                                              Object.entries(scores).forEach(([pId, pts]) => {
-                                                  if(pts > maxPts) { maxPts=pts; bestPlayer=teamA.players.find(p=>p.id===pId)?.name.split(' ')[0]||'Jugador'; }
-                                              });
-                                              return maxPts > 0 ? bestPlayer : 'N/A';
-                                          })()}
-                                      </span>
+                const pScores: Record<string, number> = {};
+                history.filter(h => ['attack', 'block', 'ace'].includes(h.type)).forEach(h => {
+                    if (h.playerId) pScores[h.playerId] = (pScores[h.playerId] || 0) + 1;
+                });
+                let topPId = '';
+                let topPts = 0;
+                Object.entries(pScores).forEach(([pId, pts]) => {
+                    if (pts > topPts) { topPts = pts; topPId = pId; }
+                });
+                const topPlayer = activeStatTeam.players.find(p => p.id === topPId);
+
+                return { totalPts, attacks, attackPct, blocks, aces, topPlayer, topPts };
+            })() : null;
+
+            return (
+              <div className={`relative z-10 transition-all duration-300
+                  ${isVertical 
+                      ? 'absolute top-0 left-0 h-full w-40 md:w-48 flex items-center justify-center pointer-events-none' 
+                      : 'absolute bottom-4 md:bottom-7 left-1/2 -translate-x-1/2 w-full max-w-[760px] md:max-w-[800px] px-2 md:px-3 pointer-events-none scale-90 sm:scale-95 lg:scale-100 flex justify-center origin-bottom'
+                  }
+              `}
+              style={(boardAnim === 'in' || boardAnim === 'out') ? {
+                  animation: boardAnim === 'in' 
+                      ? 'drawBoardIn 0.8s cubic-bezier(0.8, 0, 0.2, 1) forwards' 
+                      : 'drawBoardOut 0.8s cubic-bezier(0.8, 0, 0.2, 1) forwards'
+              } : {}}
+              >
+                  
+                  <div className={`bg-transparent rounded-none overflow-visible flex flex-col items-center pointer-events-auto shrink-0 relative
+                      ${isVertical 
+                          ? 'rotate-90 origin-center w-[58vh] max-w-none h-12 md:h-14 shadow-[0_25px_50px_rgba(0,0,0,0.85)]' 
+                          : 'w-full h-11 md:h-13 shadow-[0_25px_50px_rgba(0,0,0,0.85)]'
+                      }
+                  `}>
+                      {/* Top Tab for Tournament Name */}
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 bg-gradient-to-r from-slate-950/95 via-[#0b1022]/95 to-slate-950/95 rounded-t-xl px-5 md:px-10 py-1 md:py-1.5 flex items-center gap-2.5 text-white font-black text-[10px] md:text-xs tracking-[0.25em] shadow-2xl border-t border-x border-white/15">
+                         <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse shadow-[0_0_8px_#ef4444]"></div>
+                         <span className="truncate max-w-[200px] md:max-w-[400px]">{tournament?.name || "LIGA PROFESIONAL"}</span>
+                         <span className="text-white/30 text-[9px]">|</span>
+                         <span className="text-cyan-400 text-[9px] md:text-[10px] font-bold">SET {match.currentSet}</span>
+                      </div>
+                      
+                      {/* Set Point / Match Point Banner */}
+                      {pointBanner && (
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-7 z-50 pointer-events-none flex flex-col items-center justify-center animate-in slide-in-from-bottom-5 duration-500">
+                               <div className="bg-gradient-to-t from-black/95 to-black/75 backdrop-blur-md px-12 md:px-24 py-3 md:py-5 rounded-t-[1.5rem] border-t-4 border-x border-white/20 shadow-[0_-20px_50px_rgba(0,0,0,0.7)]" style={{ borderTopColor: pointBanner.color }}>
+                                   <h1 className="text-4xl md:text-6xl font-black text-white italic uppercase tracking-[0.15em] drop-shadow-lg" style={{ color: pointBanner.color }}>
+                                       {pointBanner.text}
+                                   </h1>
+                                   <div className="mt-1 flex justify-center">
+                                       <div className="text-white/90 font-bold uppercase tracking-[0.2em] text-xs md:text-sm bg-white/10 px-4 py-1 rounded-full border border-white/10">
+                                           {pointBanner.text === 'MATCH POINT' ? 'PUNTO DE PARTIDO' : 'PUNTO DE SET'}
+                                       </div>
+                                   </div>
+                               </div>
+                          </div>
+                      )}
+
+                      {/* Team Statistics HUD Banner when EQ. A or EQ. B is selected */}
+                      {activeStatTeam && !isVertical && (
+                          <div className={`absolute bottom-full mb-3 z-40 animate-in slide-in-from-bottom-3 fade-in duration-300 w-full sm:w-[48%] min-w-[300px] max-w-[390px] ${
+                              isLeftTeamActive ? 'left-0' : 'right-0'
+                          }`}>
+                              <div className={`p-3 rounded-2xl border-2 backdrop-blur-xl shadow-2xl flex flex-col gap-2 ${
+                                  activeStatTeam.id === teamA.id
+                                      ? 'bg-gradient-to-br from-[#0c1a36]/95 via-[#081226]/95 to-[#040814]/95 border-cyan-400/80 shadow-[0_0_25px_rgba(34,211,238,0.4)]'
+                                      : 'bg-gradient-to-br from-[#2e1026]/95 via-[#1c0917]/95 to-[#0a0308]/95 border-rose-400/80 shadow-[0_0_25px_rgba(244,63,94,0.4)]'
+                              }`}>
+                                  {/* Header */}
+                                  <div className="flex items-center justify-between border-b border-white/10 pb-1.5">
+                                      <div className="flex items-center gap-2 min-w-0">
+                                          {activeStatTeam.logoUrl ? (
+                                              <img src={activeStatTeam.logoUrl} className="w-7 h-7 object-contain rounded-lg bg-black/50 p-0.5 border border-white/10 shrink-0" alt="" />
+                                          ) : (
+                                              <div className="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center font-black text-xs text-white shrink-0">
+                                                  {activeStatTeam.name[0]}
+                                              </div>
+                                          )}
+                                          <div className="min-w-0">
+                                              <div className="flex items-center gap-1.5">
+                                                  <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
+                                                      activeStatTeam.id === teamA.id ? 'bg-cyan-500/30 text-cyan-300 border border-cyan-400/40' : 'bg-rose-500/30 text-rose-300 border border-rose-400/40'
+                                                  }`}>
+                                                      {activeStatTeam.id === teamA.id ? 'EQ. A' : 'EQ. B'}
+                                                  </span>
+                                                  <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">ESTADÍSTICAS OFICIALES</span>
+                                              </div>
+                                              <h3 className="text-white font-black text-xs md:text-sm uppercase tracking-wider truncate">
+                                                  {activeStatTeam.name}
+                                              </h3>
+                                          </div>
+                                      </div>
+                                      <div className="text-right shrink-0">
+                                          <span className="text-[8px] text-slate-400 uppercase font-mono block leading-none">PUNTOS</span>
+                                          <span className={`text-base font-mono font-black ${activeStatTeam.id === teamA.id ? 'text-cyan-300' : 'text-rose-400'}`}>
+                                              {activeTeamQuickStats?.totalPts ?? 0}
+                                          </span>
+                                      </div>
                                   </div>
-                                  <div className="relative w-8 h-8 md:w-12 md:h-12 flex items-center justify-center">
-                                       <svg className="absolute inset-0 w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                                          <path stroke="rgba(255,255,255,0.1)" strokeWidth="4" fill="none" strokeDasharray="50, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
-                                          <path stroke="#38bdf8" strokeWidth="4" strokeLinecap="round" strokeDasharray={`${(()=>{
-                                              if(activeTvSettings?.showPlayerStats || activeTvSettings?.featuredPlayerMode === 'stats') {
-                                                  let maxPts = 0;
-                                                  const scores: Record<string, number> = {};
-                                                  match.sets.flatMap(s=>s.history).filter(h=>h.teamId===teamA.id && ['attack','block','ace'].includes(h.type)).forEach(h => {
-                                                      if(h.playerId) { scores[h.playerId] = (scores[h.playerId] || 0) + 1; }
-                                                  });
-                                                  if (activeTvSettings?.featuredPlayerMode === 'stats' && activeTvSettings.featuredPlayerId) {
-                                                      return Math.min(50, ((scores[activeTvSettings.featuredPlayerId] || 0)/10)*50);
-                                                  }
-                                                  Object.values(scores).forEach(pts => { if(pts>maxPts) maxPts=pts; });
-                                                  return Math.min(50, (maxPts/10)*50);
-                                              } else {
-                                                  const acts = match.sets.flatMap(s=>s.history).filter(h=>h.teamId===teamA.id && h.type==='attack');
-                                                  const succ = acts.length; 
-                                                  const err = match.sets.flatMap(s=>s.history).filter(h=>h.teamId!==teamA.id && h.type==='opponent_error').length;
-                                                  const tot = succ + err;
-                                                  return tot > 0 ? (succ/tot)*50 : 0;
-                                              }
-                                          })()}, 100`} fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" className="transition-all duration-1000 ease-out"/>
-                                       </svg>
-                                       <span className="text-white font-black text-[10px] md:text-sm">{(()=>{
-                                            if(activeTvSettings?.showPlayerStats || activeTvSettings?.featuredPlayerMode === 'stats') {
-                                                let maxPts = 0;
-                                                const scores: Record<string, number> = {};
-                                                match.sets.flatMap(s=>s.history).filter(h=>h.teamId===teamA.id && ['attack','block','ace'].includes(h.type)).forEach(h => {
-                                                    if(h.playerId) { scores[h.playerId] = (scores[h.playerId] || 0) + 1; }
-                                                });
-                                                if (activeTvSettings?.featuredPlayerMode === 'stats' && activeTvSettings.featuredPlayerId) {
-                                                    const fpPts = scores[activeTvSettings.featuredPlayerId] || 0;
-                                                    return fpPts + (fpPts===1?'pt':'pts');
-                                                }
-                                                Object.values(scores).forEach(pts => { if(pts>maxPts) maxPts=pts; });
-                                                return maxPts + (maxPts===1?'pt':'pts');
-                                            } else {
-                                                const acts = match.sets.flatMap(s=>s.history).filter(h=>h.teamId===teamA.id && h.type==='attack');
-                                                const succ = acts.length; 
-                                                const err = match.sets.flatMap(s=>s.history).filter(h=>h.teamId!==teamA.id && h.type==='opponent_error').length;
-                                                const tot = succ + err;
-                                                return tot > 0 ? Math.round((succ/tot)*100)+'%' : '0%';
-                                            }
-                                       })()}</span>
+
+                                  {/* Stat Metrics Grid */}
+                                  <div className="grid grid-cols-3 gap-1.5 text-center">
+                                      <div className="bg-black/50 rounded-xl p-1.5 border border-white/5">
+                                          <div className="text-[8px] text-slate-400 uppercase font-bold">Ataque</div>
+                                          <div className="text-xs font-mono font-black text-white">
+                                              {activeTeamQuickStats?.attacks ?? 0} <span className="text-[9px] text-slate-400 font-normal">({activeTeamQuickStats?.attackPct ?? 0}%)</span>
+                                          </div>
+                                      </div>
+                                      <div className="bg-black/50 rounded-xl p-1.5 border border-white/5">
+                                          <div className="text-[8px] text-slate-400 uppercase font-bold">Bloqueos</div>
+                                          <div className="text-xs font-mono font-black text-amber-300">
+                                              {activeTeamQuickStats?.blocks ?? 0} pts
+                                          </div>
+                                      </div>
+                                      <div className="bg-black/50 rounded-xl p-1.5 border border-white/5">
+                                          <div className="text-[8px] text-slate-400 uppercase font-bold">Saque (Aces)</div>
+                                          <div className="text-xs font-mono font-black text-emerald-400">
+                                              {activeTeamQuickStats?.aces ?? 0} pts
+                                          </div>
+                                      </div>
                                   </div>
-                             </div>
-                        </div>
-                    )}
 
-                    {/* Right Attachment (Team B Stats) */}
-                    {(activeTvSettings?.showTeamStats === teamB.id || activeTvSettings?.showPlayerStats || (activeTvSettings?.featuredPlayerMode === 'stats' && teamB.players.some(p => p.id === activeTvSettings?.featuredPlayerId))) && !isVertical && (
-                        <div className="absolute top-1/2 -translate-y-1/2 left-[100%] pl-2 h-[85%] flex animate-in slide-in-from-left fade-in pointer-events-none">
-                             <div className="h-full bg-gradient-to-l from-transparent via-[#2b1629] to-[#181d2e] rounded-r-2xl border-y border-r border-white/10 shadow-2xl flex items-center pl-4 pr-8 gap-3">
-                                  <div className="relative w-8 h-8 md:w-12 md:h-12 flex items-center justify-center">
-                                       <svg className="absolute inset-0 w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                                          <path stroke="rgba(255,255,255,0.1)" strokeWidth="4" fill="none" strokeDasharray="50, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
-                                          <path stroke="#f43f5e" strokeWidth="4" strokeLinecap="round" strokeDasharray={`${(()=>{
-                                              if(activeTvSettings?.showPlayerStats || activeTvSettings?.featuredPlayerMode === 'stats') {
-                                                  let maxPts = 0;
-                                                  const scores: Record<string, number> = {};
-                                                  match.sets.flatMap(s=>s.history).filter(h=>h.teamId===teamB.id && ['attack','block','ace'].includes(h.type)).forEach(h => {
-                                                      if(h.playerId) { scores[h.playerId] = (scores[h.playerId] || 0) + 1; }
-                                                  });
-                                                  if (activeTvSettings?.featuredPlayerMode === 'stats' && activeTvSettings.featuredPlayerId) {
-                                                      return Math.min(50, ((scores[activeTvSettings.featuredPlayerId] || 0)/10)*50);
-                                                  }
-                                                  Object.values(scores).forEach(pts => { if(pts>maxPts) maxPts=pts; });
-                                                  return Math.min(50, (maxPts/10)*50);
-                                              } else {
-                                                  const acts = match.sets.flatMap(s=>s.history).filter(h=>h.teamId===teamB.id && h.type==='attack');
-                                                  const succ = acts.length; 
-                                                  const err = match.sets.flatMap(s=>s.history).filter(h=>h.teamId!==teamB.id && h.type==='opponent_error').length;
-                                                  const tot = succ + err;
-                                                  return tot > 0 ? (succ/tot)*50 : 0;
-                                              }
-                                          })()}, 100`} fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" className="transition-all duration-1000 ease-out"/>
-                                       </svg>
-                                       <span className="text-white font-black text-[10px] md:text-sm">{(()=>{
-                                            if(activeTvSettings?.showPlayerStats || activeTvSettings?.featuredPlayerMode === 'stats') {
-                                                let maxPts = 0;
-                                                const scores: Record<string, number> = {};
-                                                match.sets.flatMap(s=>s.history).filter(h=>h.teamId===teamB.id && ['attack','block','ace'].includes(h.type)).forEach(h => {
-                                                    if(h.playerId) { scores[h.playerId] = (scores[h.playerId] || 0) + 1; }
-                                                });
-                                                if (activeTvSettings?.featuredPlayerMode === 'stats' && activeTvSettings.featuredPlayerId) {
-                                                    const fpPts = scores[activeTvSettings.featuredPlayerId] || 0;
-                                                    return fpPts + (fpPts===1?'pt':'pts');
-                                                }
-                                                Object.values(scores).forEach(pts => { if(pts>maxPts) maxPts=pts; });
-                                                return maxPts + (maxPts===1?'pt':'pts');
-                                            } else {
-                                                const acts = match.sets.flatMap(s=>s.history).filter(h=>h.teamId===teamB.id && h.type==='attack');
-                                                const succ = acts.length; 
-                                                const err = match.sets.flatMap(s=>s.history).filter(h=>h.teamId!==teamB.id && h.type==='opponent_error').length;
-                                                const tot = succ + err;
-                                                return tot > 0 ? Math.round((succ/tot)*100)+'%' : '0%';
-                                            }
-                                       })()}</span>
+                                  {/* Top Scorer Banner */}
+                                  {activeTeamQuickStats?.topPlayer && (
+                                      <div className="flex items-center justify-between bg-white/5 px-2.5 py-1 rounded-xl text-[10px] border border-white/5">
+                                          <span className="text-slate-400 font-bold uppercase tracking-wider">Top Anotador:</span>
+                                          <span className="text-white font-black uppercase truncate ml-2">
+                                              #{activeTeamQuickStats.topPlayer.number} {activeTeamQuickStats.topPlayer.name} ({activeTeamQuickStats.topPts} pts)
+                                          </span>
+                                      </div>
+                                  )}
+                              </div>
+                          </div>
+                      )}
+
+                      <div className="w-full h-full flex rounded-xl shadow-2xl overflow-hidden font-sans border border-white/15 backdrop-blur-xl">
+                          
+                          {/* Team A/Left Section */}
+                          <div className={`flex-1 flex items-center justify-between pl-2 md:pl-4 pr-0 bg-gradient-to-r from-slate-950/95 via-[#0e172e]/95 to-[#162347]/95 transition-all duration-300 ${
+                              isLeftTeamActive ? 'ring-2 ring-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.5)] z-20' : ''
+                          }`} style={{ borderLeft: `5px solid ${swapSides ? '#f43f5e' : '#38bdf8'}` }}>
+                              <div className="flex flex-row items-center flex-1 min-w-0">
+                                  {/* Logo & Serve */}
+                                  <div className="bg-black/50 border border-white/10 rounded-lg relative flex-shrink-0 flex items-center justify-center w-7 h-7 md:w-11 md:h-11 mr-2 md:mr-3 p-1 shadow-md">
+                                      {(swapSides ? teamB : teamA).logoUrl ? (
+                                          <img src={(swapSides ? teamB : teamA).logoUrl} className="w-full h-full object-contain" />
+                                      ) : (
+                                          <div className="w-full h-full bg-cyan-950/60 rounded flex items-center justify-center text-cyan-300 font-black text-xs md:text-sm">
+                                              {(swapSides ? teamB : teamA).name[0]}
+                                          </div>
+                                      )}
                                   </div>
-                                  <div className="flex flex-col items-start">
-                                      <span className="text-[7px] md:text-[9px] font-black text-white/50 uppercase tracking-[0.2em] leading-none">
-                                          {activeTvSettings?.showTeamStats === teamB.id ? 'Ataque Efectividad' : (activeTvSettings?.featuredPlayerMode === 'stats' ? 'Destacado' : 'Top Anotador')}
-                                      </span>
-                                      <span className="text-[10px] md:text-sm font-black text-rose-400 uppercase tracking-widest leading-none mt-1">
-                                          {activeTvSettings?.showTeamStats === teamB.id ? 'Equipo B' : (()=>{
-                                              if (activeTvSettings?.featuredPlayerMode === 'stats') {
-                                                  const fp = teamB.players.find(p=>p.id===activeTvSettings?.featuredPlayerId);
-                                                  return fp ? `#${fp.number} ${fp.name.split(' ')[0]}` : '';
+
+                                  {/* Name & Sets Won */}
+                                  <div className="flex-1 min-w-0 pr-2">
+                                      <div className="flex items-center gap-2">
+                                          <span className={`px-1.5 py-0.5 rounded text-[8px] md:text-[9px] font-black tracking-wider uppercase shrink-0 border ${
+                                              swapSides 
+                                                  ? 'bg-rose-500/25 text-rose-300 border-rose-400/40' 
+                                                  : 'bg-cyan-500/25 text-cyan-300 border-cyan-400/40'
+                                          }`}>
+                                              {swapSides ? 'EQ. B' : 'EQ. A'}
+                                          </span>
+                                          <h2 className={`text-white font-black uppercase tracking-wider truncate drop-shadow-md ${isVertical ? 'text-xs md:text-sm' : 'text-xs md:text-base lg:text-lg'}`}>
+                                              {(swapSides ? teamB : teamA).name}
+                                          </h2>
+                                          {(swapSides ? match.servingTeamId === teamB.id : match.servingTeamId === teamA.id) && (
+                                              <div className="flex items-center gap-1 bg-cyan-400 text-slate-950 font-black text-[7px] md:text-[9px] px-1.5 py-0.5 rounded shadow-[0_0_8px_rgba(34,211,238,0.8)] animate-pulse shrink-0">
+                                                  <span>🏐</span>
+                                                  <span className="hidden sm:inline">SAQUE</span>
+                                              </div>
+                                          )}
+                                      </div>
+                                      
+                                      {/* Set Dots & Timeouts */}
+                                      <div className="flex items-center gap-1.5 mt-0.5 md:mt-1">
+                                          {Array.from({length: requiredWins}).map((_, i) => (
+                                              <div 
+                                                  key={i} 
+                                                  className={`w-3.5 md:w-5 h-1.5 md:h-2 rounded-sm transition-all duration-300 ${
+                                                      i < (swapSides ? winsB : winsA) 
+                                                          ? 'bg-cyan-400 shadow-[0_0_8px_#22d3ee]' 
+                                                          : 'bg-white/10 border border-white/5'
+                                                  }`}
+                                              />
+                                          ))}
+                                          <span className="text-[7px] md:text-[9px] text-slate-400 font-bold ml-1 tracking-wider">
+                                              {swapSides 
+                                                  ? `T:${match.timeoutsB || 0}/2 • S:${match.substitutionsB || 0}/6` 
+                                                  : `T:${match.timeoutsA || 0}/2 • S:${match.substitutionsA || 0}/6`
                                               }
-                                              let bestPlayer = 'NINGUNO'; let maxPts = 0;
-                                              const scores: Record<string, number> = {};
-                                              match.sets.flatMap(s=>s.history).filter(h=>h.teamId===teamB.id && ['attack','block','ace'].includes(h.type)).forEach(h => {
-                                                  if(h.playerId) { scores[h.playerId] = (scores[h.playerId] || 0) + 1; }
-                                              });
-                                              Object.entries(scores).forEach(([pId, pts]) => {
-                                                  if(pts > maxPts) { maxPts=pts; bestPlayer=teamB.players.find(p=>p.id===pId)?.name.split(' ')[0]||'Jugador'; }
-                                              });
-                                              return maxPts > 0 ? bestPlayer : 'N/A';
-                                          })()}
-                                      </span>
+                                          </span>
+                                      </div>
                                   </div>
-                             </div>
-                        </div>
-                    )}
+                              </div>
 
-                    <div className="w-full h-full flex rounded-xl shadow-2xl overflow-hidden font-sans border border-white/15 backdrop-blur-xl">
-                        
-                        {/* Team A/Left Section */}
-                        <div className="flex-1 flex items-center justify-between pl-2 md:pl-4 pr-0 bg-gradient-to-r from-slate-950/95 via-[#0e172e]/95 to-[#162347]/95" style={{ borderLeft: `5px solid ${swapSides ? '#f43f5e' : '#38bdf8'}` }}>
-                            <div className="flex flex-row items-center flex-1 min-w-0">
-                                {/* Logo & Serve */}
-                                <div className="bg-black/50 border border-white/10 rounded-lg relative flex-shrink-0 flex items-center justify-center w-7 h-7 md:w-11 md:h-11 mr-2 md:mr-3 p-1 shadow-md">
-                                    {(swapSides ? teamB : teamA).logoUrl ? (
-                                        <img src={(swapSides ? teamB : teamA).logoUrl} className="w-full h-full object-contain" />
-                                    ) : (
-                                        <div className="w-full h-full bg-cyan-950/60 rounded flex items-center justify-center text-cyan-300 font-black text-xs md:text-sm">
-                                            {(swapSides ? teamB : teamA).name[0]}
-                                        </div>
-                                    )}
-                                </div>
+                              {/* Score Box */}
+                              <div className="bg-gradient-to-b from-[#060810] to-[#0c1322] h-full flex items-center justify-center px-4 md:px-7 border-l border-white/10 border-r border-[#080d1a] shadow-inner shrink-0">
+                                  <span className={`font-mono font-black tabular-nums tracking-tighter leading-none text-cyan-300 drop-shadow-[0_0_15px_rgba(34,211,238,0.4)] ${isVertical ? 'text-2xl md:text-4xl' : 'text-3xl md:text-5xl'}`}>
+                                      {swapSides ? match.scoreB : match.scoreA}
+                                  </span>
+                              </div>
+                          </div>
 
-                                {/* Name & Sets Won */}
-                                <div className="flex-1 min-w-0 pr-2">
-                                    <div className="flex items-center gap-2">
-                                        <h2 className={`text-white font-black uppercase tracking-wider truncate drop-shadow-md ${isVertical ? 'text-xs md:text-base' : 'text-xs md:text-lg lg:text-xl'}`}>
-                                            {(swapSides ? teamB : teamA).name}
-                                        </h2>
-                                        {(swapSides ? match.servingTeamId === teamB.id : match.servingTeamId === teamA.id) && (
-                                            <div className="flex items-center gap-1 bg-cyan-400 text-slate-950 font-black text-[7px] md:text-[9px] px-1.5 py-0.5 rounded shadow-[0_0_8px_rgba(34,211,238,0.8)] animate-pulse shrink-0">
-                                                <span>🏐</span>
-                                                <span className="hidden sm:inline">SAQUE</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                    
-                                    {/* Set Dots & Timeouts */}
-                                    <div className="flex items-center gap-1.5 mt-0.5 md:mt-1">
-                                        {Array.from({length: requiredWins}).map((_, i) => (
-                                            <div 
-                                                key={i} 
-                                                className={`w-3.5 md:w-5 h-1.5 md:h-2 rounded-sm transition-all duration-300 ${
-                                                    i < (swapSides ? winsB : winsA) 
-                                                        ? 'bg-cyan-400 shadow-[0_0_8px_#22d3ee]' 
-                                                        : 'bg-white/10 border border-white/5'
-                                                }`}
-                                            />
-                                        ))}
-                                        <span className="text-[7px] md:text-[9px] text-slate-400 font-bold ml-1 tracking-wider">
-                                            {swapSides 
-                                                ? `T:${match.timeoutsB || 0}/2 • S:${match.substitutionsB || 0}/6` 
-                                                : `T:${match.timeoutsA || 0}/2 • S:${match.substitutionsA || 0}/6`
-                                            }
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
+                          {/* Center Info - Set Capsule */}
+                          <div className="flex flex-col items-center justify-center z-10 relative flex-shrink-0 bg-[#090d1c] w-16 md:w-28 h-full p-1.5 border-x border-white/15 shadow-inner">
+                              <div className="text-[9px] md:text-[11px] font-black italic uppercase tracking-wider text-amber-300 bg-amber-400/15 px-2 py-0.5 rounded border border-amber-400/30 shadow-[0_0_8px_rgba(251,191,36,0.25)] text-center leading-none mb-1">
+                                  SET {match.currentSet}
+                              </div>
+                              {tournament?.logoUrl ? (
+                                  <img src={tournament.logoUrl} className="h-6 md:h-8 w-full object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]" />
+                              ) : (
+                                  <div className="text-[8px] md:text-[9px] text-white/50 font-black uppercase tracking-widest text-center leading-none">
+                                      VS
+                                  </div>
+                              )}
+                          </div>
 
-                            {/* Score Box */}
-                            <div className="bg-gradient-to-b from-[#060810] to-[#0c1322] h-full flex items-center justify-center px-4 md:px-7 border-l border-white/10 border-r border-[#080d1a] shadow-inner shrink-0">
-                                <span className={`font-mono font-black tabular-nums tracking-tighter leading-none text-cyan-300 drop-shadow-[0_0_15px_rgba(34,211,238,0.4)] ${isVertical ? 'text-2xl md:text-4xl' : 'text-3xl md:text-5xl'}`}>
-                                    {swapSides ? match.scoreB : match.scoreA}
-                                </span>
-                            </div>
-                        </div>
+                          {/* Team B/Right Section */}
+                          <div className={`flex-1 flex items-center justify-between pr-2 md:pr-4 pl-0 bg-gradient-to-l from-slate-950/95 via-[#241324]/95 to-[#331733]/95 flex-row-reverse transition-all duration-300 ${
+                              isRightTeamActive ? 'ring-2 ring-rose-400 shadow-[0_0_20px_rgba(244,63,94,0.5)] z-20' : ''
+                          }`} style={{ borderRight: `5px solid ${swapSides ? '#38bdf8' : '#f43f5e'}` }}>
+                              <div className="flex flex-row-reverse items-center flex-1 min-w-0">
+                                  {/* Logo & Serve */}
+                                  <div className="bg-black/50 border border-white/10 rounded-lg relative flex-shrink-0 flex items-center justify-center w-7 h-7 md:w-11 md:h-11 ml-2 md:ml-3 p-1 shadow-md">
+                                      {(swapSides ? teamA : teamB).logoUrl ? (
+                                          <img src={(swapSides ? teamA : teamB).logoUrl} className="w-full h-full object-contain" />
+                                      ) : (
+                                          <div className="w-full h-full bg-rose-950/60 rounded flex items-center justify-center text-rose-300 font-black text-xs md:text-sm">
+                                              {(swapSides ? teamA : teamB).name[0]}
+                                          </div>
+                                      )}
+                                  </div>
 
-                        {/* Center Info - Set Capsule */}
-                        <div className="flex flex-col items-center justify-center z-10 relative flex-shrink-0 bg-[#090d1c] w-16 md:w-28 h-full p-1.5 border-x border-white/15 shadow-inner">
-                            <div className="text-[9px] md:text-[11px] font-black italic uppercase tracking-wider text-amber-300 bg-amber-400/15 px-2 py-0.5 rounded border border-amber-400/30 shadow-[0_0_8px_rgba(251,191,36,0.25)] text-center leading-none mb-1">
-                                SET {match.currentSet}
-                            </div>
-                            {tournament?.logoUrl ? (
-                                <img src={tournament.logoUrl} className="h-6 md:h-8 w-full object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]" />
-                            ) : (
-                                <div className="text-[8px] md:text-[9px] text-white/50 font-black uppercase tracking-widest text-center leading-none">
-                                    VS
-                                </div>
-                            )}
-                        </div>
+                                  {/* Name & Sets Won */}
+                                  <div className="flex-1 min-w-0 pl-2 flex flex-col items-end">
+                                      <div className="flex items-center gap-2 justify-end">
+                                          {(swapSides ? match.servingTeamId === teamA.id : match.servingTeamId === teamB.id) && (
+                                              <div className="flex items-center gap-1 bg-rose-500 text-white font-black text-[7px] md:text-[9px] px-1.5 py-0.5 rounded shadow-[0_0_8px_rgba(244,63,94,0.8)] animate-pulse shrink-0">
+                                                  <span>🏐</span>
+                                                  <span className="hidden sm:inline">SAQUE</span>
+                                              </div>
+                                          )}
+                                          <h2 className={`text-white font-black uppercase tracking-wider truncate drop-shadow-md ${isVertical ? 'text-xs md:text-sm' : 'text-xs md:text-base lg:text-lg'}`}>
+                                              {(swapSides ? teamA : teamB).name}
+                                          </h2>
+                                          <span className={`px-1.5 py-0.5 rounded text-[8px] md:text-[9px] font-black tracking-wider uppercase shrink-0 border ${
+                                              swapSides 
+                                                  ? 'bg-cyan-500/25 text-cyan-300 border-cyan-400/40' 
+                                                  : 'bg-rose-500/25 text-rose-300 border-rose-400/40'
+                                          }`}>
+                                              {swapSides ? 'EQ. A' : 'EQ. B'}
+                                          </span>
+                                      </div>
+                                      
+                                      {/* Set Dots & Timeouts */}
+                                      <div className="flex items-center gap-1.5 mt-0.5 md:mt-1 justify-end">
+                                          <span className="text-[7px] md:text-[9px] text-slate-400 font-bold mr-1 tracking-wider">
+                                              {swapSides 
+                                                  ? `T:${match.timeoutsA || 0}/2 • S:${match.substitutionsA || 0}/6` 
+                                                  : `T:${match.timeoutsB || 0}/2 • S:${match.substitutionsB || 0}/6`
+                                              }
+                                          </span>
+                                          {Array.from({length: requiredWins}).map((_, i) => (
+                                              <div 
+                                                  key={i} 
+                                                  className={`w-3.5 md:w-5 h-1.5 md:h-2 rounded-sm transition-all duration-300 ${
+                                                      i < (swapSides ? winsA : winsB) 
+                                                          ? 'bg-rose-500 shadow-[0_0_8px_#f43f5e]' 
+                                                          : 'bg-white/10 border border-white/5'
+                                                  }`}
+                                              />
+                                          ))}
+                                      </div>
+                                  </div>
+                              </div>
 
-                        {/* Team B/Right Section */}
-                        <div className="flex-1 flex items-center justify-between pr-2 md:pr-4 pl-0 bg-gradient-to-l from-slate-950/95 via-[#241324]/95 to-[#331733]/95 flex-row-reverse" style={{ borderRight: `5px solid ${swapSides ? '#38bdf8' : '#f43f5e'}` }}>
-                            <div className="flex flex-row-reverse items-center flex-1 min-w-0">
-                                {/* Logo & Serve */}
-                                <div className="bg-black/50 border border-white/10 rounded-lg relative flex-shrink-0 flex items-center justify-center w-7 h-7 md:w-11 md:h-11 ml-2 md:ml-3 p-1 shadow-md">
-                                    {(swapSides ? teamA : teamB).logoUrl ? (
-                                        <img src={(swapSides ? teamA : teamB).logoUrl} className="w-full h-full object-contain" />
-                                    ) : (
-                                        <div className="w-full h-full bg-rose-950/60 rounded flex items-center justify-center text-rose-300 font-black text-xs md:text-sm">
-                                            {(swapSides ? teamA : teamB).name[0]}
-                                        </div>
-                                    )}
-                                </div>
+                              {/* Score Box */}
+                              <div className="bg-gradient-to-b from-[#060810] to-[#1c0c1b] h-full flex items-center justify-center px-4 md:px-7 border-r border-white/10 border-l border-[#140813] shadow-inner shrink-0">
+                                  <span className={`font-mono font-black tabular-nums tracking-tighter leading-none text-rose-300 drop-shadow-[0_0_15px_rgba(244,63,94,0.4)] ${isVertical ? 'text-2xl md:text-4xl' : 'text-3xl md:text-5xl'}`}>
+                                      {swapSides ? match.scoreA : match.scoreB}
+                                  </span>
+                              </div>
+                          </div>
 
-                                {/* Name & Sets Won */}
-                                <div className="flex-1 min-w-0 pl-2 flex flex-col items-end">
-                                    <div className="flex items-center gap-2 justify-end">
-                                        {(swapSides ? match.servingTeamId === teamA.id : match.servingTeamId === teamB.id) && (
-                                            <div className="flex items-center gap-1 bg-rose-500 text-white font-black text-[7px] md:text-[9px] px-1.5 py-0.5 rounded shadow-[0_0_8px_rgba(244,63,94,0.8)] animate-pulse shrink-0">
-                                                <span>🏐</span>
-                                                <span className="hidden sm:inline">SAQUE</span>
-                                            </div>
-                                        )}
-                                        <h2 className={`text-white font-black uppercase tracking-wider truncate drop-shadow-md ${isVertical ? 'text-xs md:text-base' : 'text-xs md:text-lg lg:text-xl'}`}>
-                                            {(swapSides ? teamA : teamB).name}
-                                        </h2>
-                                    </div>
-                                    
-                                    {/* Set Dots & Timeouts */}
-                                    <div className="flex items-center gap-1.5 mt-0.5 md:mt-1 justify-end">
-                                        <span className="text-[7px] md:text-[9px] text-slate-400 font-bold mr-1 tracking-wider">
-                                            {swapSides 
-                                                ? `T:${match.timeoutsA || 0}/2 • S:${match.substitutionsA || 0}/6` 
-                                                : `T:${match.timeoutsB || 0}/2 • S:${match.substitutionsB || 0}/6`
-                                            }
-                                        </span>
-                                        {Array.from({length: requiredWins}).map((_, i) => (
-                                            <div 
-                                                key={i} 
-                                                className={`w-3.5 md:w-5 h-1.5 md:h-2 rounded-sm transition-all duration-300 ${
-                                                    i < (swapSides ? winsA : winsB) 
-                                                        ? 'bg-rose-500 shadow-[0_0_8px_#f43f5e]' 
-                                                        : 'bg-white/10 border border-white/5'
-                                                }`}
-                                            />
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Score Box */}
-                            <div className="bg-gradient-to-b from-[#060810] to-[#1c0c1b] h-full flex items-center justify-center px-4 md:px-7 border-r border-white/10 border-l border-[#140813] shadow-inner shrink-0">
-                                <span className={`font-mono font-black tabular-nums tracking-tighter leading-none text-rose-300 drop-shadow-[0_0_15px_rgba(244,63,94,0.4)] ${isVertical ? 'text-2xl md:text-4xl' : 'text-3xl md:text-5xl'}`}>
-                                    {swapSides ? match.scoreA : match.scoreB}
-                                </span>
-                            </div>
-                        </div>
-
-                    </div>
-                </div>
-            </div>
-          )
+                      </div>
+                  </div>
+              </div>
+            );
+          })()
       )}
 
       {/* --- CONTROLS OVERLAY --- */}
@@ -2870,61 +2995,86 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
 
       {/* --- CELL PHONE WIRELESS LINK MODAL --- */}
       {showQRModal && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-              <div className="bg-[#111625] border border-white/10 rounded-2xl max-w-md w-full p-6 text-white flex flex-col gap-4 shadow-2xl relative">
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 md:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+              <div className="bg-[#0f172a] border border-cyan-500/30 rounded-3xl max-w-md w-full p-5 md:p-6 text-white flex flex-col gap-4 shadow-[0_25px_60px_rgba(0,0,0,0.9)] relative max-h-[92vh] overflow-y-auto">
                   <button 
                       onClick={() => setShowQRModal(false)}
-                      className="absolute top-4 right-4 text-slate-400 hover:text-white text-sm"
+                      className="absolute top-4 right-4 text-slate-400 hover:text-white text-base w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center transition-all"
                   >
                       ✕
                   </button>
 
-                  <div className="text-center flex flex-col items-center gap-2">
-                      <div className="bg-blue-600/20 p-3 rounded-full text-blue-400">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="text-center flex flex-col items-center gap-1.5 pt-1">
+                      <div className="bg-cyan-500/20 border border-cyan-400/40 p-3 rounded-2xl text-cyan-400 shadow-md">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
                           </svg>
                       </div>
-                      <h3 className="text-lg font-black uppercase tracking-wider">Enlazar Cámara Inalámbrica</h3>
-                      <p className="text-xs text-slate-400 max-w-xs">Puedes conectar múltiples teléfonos móviles como cámaras auxiliares para grabaciones multi-ángulo y análisis de VAR.</p>
+                      <h3 className="text-lg font-black uppercase tracking-wider text-white">Conectar Celular (Cámara VAR)</h3>
+                      <p className="text-xs text-slate-400 max-w-xs leading-relaxed">
+                        Escanea el código QR con tu celular para enlazar la cámara en vivo a la consola de repeticiones.
+                      </p>
                   </div>
 
-                  <div className="bg-black/30 border border-white/5 rounded-xl p-4 flex flex-col gap-3">
-                      <div>
-                          <span className="text-[10px] font-bold text-slate-500 uppercase">Instrucciones de Conexión</span>
-                          <p className="text-xs text-slate-300 mt-1">1. Abre el navegador de tu celular.</p>
-                          <p className="text-xs text-slate-300 mt-0.5">2. Ve al siguiente enlace:</p>
-                          <div className="bg-slate-900 border border-white/5 rounded px-3 py-1.5 mt-1 flex items-center justify-between">
-                              <span className="text-[10px] font-mono text-blue-400 select-all truncate max-w-[240px]">
-                                  {window.location.origin}
-                              </span>
-                              <button 
-                                  onClick={() => {
-                                      navigator.clipboard.writeText(window.location.origin);
-                                      alert("Enlace copiado al portapapeles");
-                                  }}
-                                  className="text-[9px] bg-slate-800 hover:bg-slate-700 text-slate-200 px-2 py-1 rounded"
-                              >
-                                  Copiar
-                              </button>
-                          </div>
+                  {/* QR Code and Direct Link */}
+                  <div className="bg-black/60 border border-white/10 rounded-2xl p-4 flex flex-col items-center gap-3">
+                      <div className="bg-white p-3 rounded-2xl shadow-xl flex items-center justify-center">
+                          <QRCodeSVG 
+                              value={getVarDirectUrl(match.matchId)} 
+                              size={160}
+                              level="M"
+                              includeMargin={false}
+                          />
                       </div>
-
-                      <div>
-                          <p className="text-xs text-slate-300">3. Haz clic en <strong className="text-white">📱 Conectar Celular (Cámara VAR)</strong>.</p>
-                          <p className="text-xs text-slate-300 mt-0.5">4. Introduce el código de este partido:</p>
-                          <div className="bg-slate-900 border border-white/5 rounded py-1 px-3 mt-1 text-center font-mono font-bold text-yellow-400 tracking-widest text-sm uppercase">
+                      
+                      <div className="w-full flex flex-col gap-1 text-center">
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Código del Partido (Match ID):</span>
+                          <div className="bg-slate-900 border border-cyan-400/30 rounded-xl py-1.5 px-3 font-mono font-black text-cyan-300 tracking-widest text-base uppercase shadow-inner">
                               {match.matchId}
                           </div>
                       </div>
+
+                      {/* Estado en vivo de cámaras conectadas */}
+                      <div className={`w-full py-2 px-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-bold transition-all ${
+                          wirelessCams.length > 0 
+                              ? 'bg-green-500/20 border-green-500/40 text-green-300' 
+                              : 'bg-yellow-500/10 border-yellow-500/30 text-yellow-300'
+                      }`}>
+                          <span className={`w-2.5 h-2.5 rounded-full ${wirelessCams.length > 0 ? 'bg-green-400 animate-ping' : 'bg-yellow-400 animate-pulse'}`}></span>
+                          <span>{wirelessCams.length > 0 ? `¡${wirelessCams.length} Celular(es) Conectado(s)!` : 'Esperando conexión del celular...'}</span>
+                      </div>
                   </div>
 
-                  <button 
-                      onClick={() => setShowQRModal(false)}
-                      className="w-full bg-blue-600 hover:bg-blue-500 text-white text-xs font-black py-3 rounded-lg uppercase transition-all mt-2"
-                  >
-                      Entendido, Cerrar
-                  </button>
+                  {/* Pasos rápidos */}
+                  <div className="bg-slate-900/60 border border-white/5 rounded-xl p-3 text-[11px] text-slate-300 flex flex-col gap-1">
+                      <p className="font-bold text-white uppercase text-[10px] tracking-wider mb-0.5">Pasos para conectar:</p>
+                      <p>1. Escanea el código QR con la cámara de tu celular.</p>
+                      <p>2. Abre el enlace en el navegador del teléfono.</p>
+                      <p>3. Acepta el permiso de la cámara y pulsa <strong className="text-cyan-400">"Conectar y Transmitir"</strong>.</p>
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                      <button 
+                          onClick={() => {
+                              const url = getVarDirectUrl(match.matchId);
+                              if (navigator.clipboard) {
+                                  navigator.clipboard.writeText(url);
+                                  setCopiedLink(true);
+                                  setTimeout(() => setCopiedLink(false), 2500);
+                              }
+                          }}
+                          className="w-full bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 text-xs font-bold py-2.5 rounded-xl uppercase transition-all flex items-center justify-center gap-2 border border-white/10"
+                      >
+                          <span>{copiedLink ? '✅' : '📋'}</span> {copiedLink ? '¡Enlace Directo Copiado al Portapapeles!' : 'Copiar Enlace Directo para Celular'}
+                      </button>
+
+                      <button 
+                          onClick={() => setShowQRModal(false)}
+                          className="w-full bg-cyan-500 hover:bg-cyan-400 active:scale-95 text-slate-950 text-xs font-black py-3 rounded-xl uppercase tracking-wider transition-all shadow-lg shadow-cyan-500/25"
+                      >
+                          Listo, Continuar Partido
+                      </button>
+                  </div>
               </div>
           </div>
       )}

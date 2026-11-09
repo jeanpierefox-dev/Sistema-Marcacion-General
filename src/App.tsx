@@ -5,6 +5,8 @@ import { ScoreControl } from './components/ScoreControl';
 import { Login } from './components/Login';
 import TVOverlay from './components/TVOverlay';
 import { VARTransmitter } from './components/VARTransmitter';
+import { RotationView } from './components/RotationView';
+import { VARConsole } from './components/VARConsole';
 import { UserManagement } from './components/UserManagement';
 import { SetStatsModal } from './components/SetStatsModal';
 import { CloudConfig } from './components/CloudConfig';
@@ -57,7 +59,7 @@ export const App: React.FC = () => {
   // --- STATE ---
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   
-  // Check for 'view' param in URL on mount to bypass login for viewers
+  // Check for 'view' or 'var' params in URL on mount
   useEffect(() => {
       const params = new URLSearchParams(window.location.search);
       const viewMatchId = params.get('view');
@@ -65,11 +67,10 @@ export const App: React.FC = () => {
           // Create a temporary guest viewer user
           const guestUser: User = { id: 'guest-' + Date.now(), username: 'Espectador', role: 'VIEWER' };
           setCurrentUser(guestUser);
-          // We will let the auto-sync logic handle the rest (setting active tournament and match)
-          // But we need to ensure the match ID is set in a way that the sync logic picks it up
-          // Actually, the sync logic relies on 'liveMatch' from cloud. 
-          // If we are just a viewer, we need to wait for cloud sync.
-          // But we can set a flag or state to auto-navigate once data loads.
+      }
+      const varParam = params.get('var') || params.get('var_code') || params.get('transmitter');
+      if (varParam) {
+          setIsTransmitterMode(true);
       }
   }, []);
 
@@ -106,6 +107,7 @@ export const App: React.FC = () => {
   const [swapSides, setSwapSides] = useState(false);
   const [tvMode, setTvMode] = useState(false);
   const [isTransmitterMode, setIsTransmitterMode] = useState(false);
+  const [showVarConsole, setShowVarConsole] = useState(false);
   const [showBracket, setShowBracket] = useState(true);
   const [showStreamGuide, setShowStreamGuide] = useState(false);
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
@@ -1561,9 +1563,27 @@ export const App: React.FC = () => {
                                  {liveMatch.status === 'warmup' ? 'Calentamiento' : liveMatch.status === 'finished_set' ? 'Set Finalizado' : liveMatch.status === 'finished' ? 'Partido Finalizado' : 'En Vivo'}
                              </span>
                          </div>
-                         <div className="flex gap-2 flex-wrap justify-end">
+                         <div className="flex gap-2 flex-wrap justify-end items-center">
                              <button onClick={toggleFullScreen} className="bg-white/5 hover:bg-white/10 text-slate-300 px-3 py-1.5 rounded text-xs font-bold uppercase tracking-widest border border-white/10 focus:ring-2 focus:ring-vnl-accent/50 outline-none hidden md:block">Pantalla Completa</button>
                              <button onClick={() => setSwapSides(!swapSides)} className="bg-white/5 hover:bg-white/10 text-slate-300 px-3 py-1.5 rounded text-xs font-bold uppercase tracking-widest border border-white/10 focus:ring-2 focus:ring-vnl-accent/50 outline-none">Cambiar Lado</button>
+                             
+                             {/* Botón Consola VAR / Challenger en la ventana de marcación */}
+                             <button 
+                                 onClick={() => setShowVarConsole(prev => !prev)} 
+                                 className={`px-3 py-1.5 rounded text-xs font-black uppercase tracking-widest flex items-center gap-1.5 shadow transition-all ${
+                                     showVarConsole || liveMatch.varChallenge?.isActive
+                                         ? 'bg-red-600 text-white shadow-[0_0_15px_rgba(239,68,68,0.5)] border border-red-400 animate-pulse' 
+                                         : 'bg-slate-800 text-red-400 hover:bg-slate-700 border border-red-500/30'
+                                 }`}
+                                 title="Consola VAR, Grabación de 5 Minutos y Desafíos Challenger"
+                             >
+                                 <span>📹</span>
+                                 <span>Desafío VAR / Challenger</span>
+                                 {liveMatch.varChallenge?.isActive && (
+                                     <span className="w-2 h-2 rounded-full bg-white animate-ping ml-1"></span>
+                                 )}
+                             </button>
+
                              {canControlMatch && (
                                  <>
                                     <button onClick={() => setTvMode(true)} className="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-xs font-bold uppercase tracking-widest shadow focus:ring-2 focus:ring-blue-400 outline-none">Vista TV 📺</button>
@@ -1573,13 +1593,38 @@ export const App: React.FC = () => {
                                  </>
                              )}
                              {currentUser.role === 'REFEREE' && (
-                                 <div className="bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 px-3 py-1 rounded text-xs font-bold uppercase tracking-widest flex items-center gap-2">
-                                     <span>⚖️</span> Modo Árbitro de Piso
-                                 </div>
+                                 <button 
+                                     onClick={handleToggleRotationView}
+                                     className="bg-yellow-400 hover:bg-yellow-300 text-slate-950 px-3.5 py-1.5 rounded text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shadow"
+                                     title="Abrir Rotación Táctica de Ambos Equipos"
+                                 >
+                                     <span>📋</span> Ver Rotación Completa
+                                 </button>
                              )}
                          </div>
                      </div>
                      
+                     {/* SECCIÓN DE DESAFÍO VAR / CHALLENGER CON BÚFER DE 5 MINUTOS */}
+                     {showVarConsole && (() => {
+                         const fixture = activeTournament.fixtures?.find(f => f.id === liveMatch.matchId);
+                         const tA = activeTournament.teams.find(t => t.id === fixture?.teamAId);
+                         const tB = activeTournament.teams.find(t => t.id === fixture?.teamBId);
+                         if (!tA || !tB) return null;
+
+                         return (
+                             <div className="mb-4">
+                                 <VARConsole 
+                                     match={liveMatch}
+                                     teamA={tA}
+                                     teamB={tB}
+                                     tournament={activeTournament}
+                                     onUpdateMatch={(updates) => updateLiveMatch(prev => prev ? { ...prev, ...updates } : null)}
+                                     onClose={() => setShowVarConsole(false)}
+                                 />
+                             </div>
+                         );
+                     })()}
+
                      {/* Game Area */}
                      <div className="flex flex-col lg:grid lg:grid-cols-12 gap-6">
                         
@@ -1818,6 +1863,7 @@ export const App: React.FC = () => {
                                 teamId={activeTournament.fixtures?.find(f => f.id === liveMatch.matchId)?.teamAId!}
                                 teamName={activeTournament.teams.find(t => t.id === activeTournament.fixtures?.find(f => f.id === liveMatch.matchId)?.teamAId)?.name!}
                                 players={activeTournament.teams.find(t => t.id === activeTournament.fixtures?.find(f => f.id === liveMatch.matchId)?.teamAId)?.players || []}
+                                rotation={liveMatch.rotationA}
                                 disabled={liveMatch.status === 'finished'}
                                 timeoutsUsed={liveMatch.timeoutsA}
                                 subsUsed={liveMatch.substitutionsA}
@@ -1845,9 +1891,12 @@ export const App: React.FC = () => {
                                 onRequestSub={initiateSubRequest}
                                 onModifyRotation={initiateRotationCheck}
                                 onSetServe={handleSetServe}
+                                onToggleRotationView={handleToggleRotationView}
+                                showRotationView={liveMatch.showRotation}
                                 teamId={activeTournament.fixtures?.find(f => f.id === liveMatch.matchId)?.teamBId!}
                                 teamName={activeTournament.teams.find(t => t.id === activeTournament.fixtures?.find(f => f.id === liveMatch.matchId)?.teamBId)?.name!}
                                 players={activeTournament.teams.find(t => t.id === activeTournament.fixtures?.find(f => f.id === liveMatch.matchId)?.teamBId)?.players || []}
+                                rotation={liveMatch.rotationB}
                                 disabled={liveMatch.status === 'finished'}
                                 timeoutsUsed={liveMatch.timeoutsB}
                                 subsUsed={liveMatch.substitutionsB}
@@ -2637,31 +2686,23 @@ export const App: React.FC = () => {
       )}
 
       {/* ROTATION VIEW OVERLAY */}
-      {liveMatch?.showRotation && ['ADMIN', 'MAIN_REFEREE', 'REFEREE'].includes(currentUser?.role || '') && activeTournament && (
-          <div className="fixed inset-0 bg-black/95 z-50 flex flex-col items-center justify-center p-4 backdrop-blur-md">
-              <div className="w-full max-w-4xl flex justify-between items-center mb-4">
-                  <h3 className="text-xl font-black text-white uppercase italic tracking-tighter">Vista de Rotación en Vivo</h3>
-                  <button onClick={handleToggleRotationView} className="bg-red-500/20 hover:bg-red-500/40 text-red-500 px-4 py-2 rounded font-bold uppercase text-xs">Cerrar</button>
-              </div>
-              <div className="w-full max-w-4xl bg-vnl-panel border border-white/20 p-4 rounded shadow-2xl flex flex-col gap-4 overflow-y-auto max-h-[80vh]">
-                  <Court 
-                      players={liveMatch.rotationA} 
-                      serving={liveMatch.servingTeamId === activeTournament.fixtures?.find(f => f.id === liveMatch.matchId)?.teamAId}
-                      teamName={activeTournament.teams.find(t => t.id === activeTournament.fixtures?.find(f => f.id === liveMatch.matchId)?.teamAId)?.name!}
-                      variant="referee"
-                      isVertical={false}
-                  />
-                  <div className="h-2 w-full bg-white/10 rounded-full my-2"></div>
-                  <Court 
-                      players={liveMatch.rotationB} 
-                      serving={liveMatch.servingTeamId === activeTournament.fixtures?.find(f => f.id === liveMatch.matchId)?.teamBId}
-                      teamName={activeTournament.teams.find(t => t.id === activeTournament.fixtures?.find(f => f.id === liveMatch.matchId)?.teamBId)?.name!}
-                      variant="referee"
-                      isVertical={false}
-                  />
-              </div>
-          </div>
-      )}
+      {liveMatch?.showRotation && ['ADMIN', 'MAIN_REFEREE', 'REFEREE'].includes(currentUser?.role || '') && activeTournament && (() => {
+          const fixture = activeTournament.fixtures?.find(f => f.id === liveMatch.matchId);
+          const tA = activeTournament.teams.find(t => t.id === fixture?.teamAId);
+          const tB = activeTournament.teams.find(t => t.id === fixture?.teamBId);
+          if (!tA || !tB) return null;
+
+          return (
+            <RotationView 
+              teamA={tA}
+              teamB={tB}
+              rotationA={liveMatch.rotationA}
+              rotationB={liveMatch.rotationB}
+              servingTeamId={liveMatch.servingTeamId}
+              onClose={handleToggleRotationView}
+            />
+          );
+      })()}
 
       {/* STREAM GUIDE MODAL */}
       <StreamGuideModal 
