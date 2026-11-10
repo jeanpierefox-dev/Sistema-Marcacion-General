@@ -2,8 +2,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Peer } from 'peerjs';
 import { QRCodeSVG } from 'qrcode.react';
-import { PEER_CONFIG, getVarPeerId, getVarDirectUrl } from '../constants/peerConfig';
-import { LiveMatchState, Team, Tournament, User } from '../types';
+import { LiveMatchState, Team, Tournament, User, Player } from '../types';
 import { ScoreControl } from './ScoreControl';
 import { RotationView } from './RotationView';
 import { calculateSetWinProbability } from '../services/volleyballPrediction';
@@ -330,60 +329,9 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
     }
   };
 
-  // 1. PeerJS Wireless Camera Receiver (Launches on Admin TV screen)
-  useEffect(() => {
-    if (isViewer) return;
+  // NOTA: El receptor PeerJS para cámaras inalámbricas está alojado exclusivamente
+  // en la consola VAR (VARConsole.tsx) para evitar colisiones de ID con el celular transmisor.
 
-    const varPeerId = getVarPeerId(match.matchId);
-    console.log("Iniciando Receptor PeerJS para VAR en ID:", varPeerId);
-    
-    let peer: Peer | null = null;
-    try {
-      peer = new Peer(varPeerId, PEER_CONFIG);
-      varPeerRef.current = peer;
-
-      peer.on('open', (id) => {
-        console.log('Receptor VAR abierto y listo en ID:', id);
-      });
-
-      peer.on('call', (call) => {
-        console.log('Llamada entrante de cámara inalámbrica:', call.peer, call.metadata);
-        call.answer(new MediaStream());
-
-        call.on('stream', (remoteStream) => {
-          console.log('Señal de video activa recibida para:', call.peer);
-          const camLabel = call.metadata?.label || `Cámara Inalámbrica ${call.peer.substring(0, 4)}`;
-          
-          setWirelessCams(prev => {
-            const filtered = prev.filter(c => c.id !== call.peer);
-            return [...filtered, { id: call.peer, label: camLabel, stream: remoteStream }];
-          });
-        });
-
-        call.on('close', () => {
-          console.log('Llamada de cámara cerrada:', call.peer);
-          setWirelessCams(prev => prev.filter(c => c.id !== call.peer));
-        });
-
-        call.on('error', (err) => {
-          console.error('Error de canal de cámara:', err);
-          setWirelessCams(prev => prev.filter(c => c.id !== call.peer));
-        });
-      });
-
-      peer.on('error', (err: any) => {
-        console.warn("Aviso en receptor PeerJS:", err?.type || err);
-      });
-    } catch (e) {
-      console.error("Error al crear instancia PeerJS:", e);
-    }
-
-    return () => {
-      if (peer) {
-        try { peer.destroy(); } catch(e){}
-      }
-    };
-  }, [match.matchId, isViewer]);
 
   // 2. Rolling Buffer Capture Loop (Captura frames cada 100ms)
   useEffect(() => {
@@ -1242,14 +1190,9 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
                     >
                         <span>🎛️</span> Volver
                     </button>
-                    <button 
-                        onClick={() => setShowVarDashboard(!showVarDashboard)}
-                        className={`${showVarDashboard ? 'bg-red-600 hover:bg-red-500' : 'bg-slate-800 hover:bg-slate-700'} text-white px-5 py-3 rounded-lg text-xs font-black transition backdrop-blur-md border border-white/10 uppercase tracking-widest flex items-center gap-2 transform hover:scale-105 active:scale-95 shadow-md`}
-                    >
-                        <span>🎥</span> Cámaras / VAR
-                    </button>
                   </div>
               )}
+
           </div>
 
           {/* STATUS BADGES */}
@@ -1542,17 +1485,38 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
           });
           
           if (typeof activeTvSettings.showVersus === 'string' && activeTvSettings.showVersus !== 'auto') {
-               // Find best by specific role
-               const roleFilter = activeTvSettings.showVersus;
-               let candidatesA = teamA.players.filter(p => p.role === roleFilter);
-               let candidatesB = teamB.players.filter(p => p.role === roleFilter);
-               
-               // Sort by highest points
-               candidatesA.sort((a,b) => (scoresA[b.id]?.pts || 0) - (scoresA[a.id]?.pts || 0));
-               candidatesB.sort((a,b) => (scoresB[b.id]?.pts || 0) - (scoresB[a.id]?.pts || 0));
-               
-               pA = candidatesA[0] || teamA.players[0]; // fallback
-               pB = candidatesB[0] || teamB.players[0]; // fallback
+               const vsOption = activeTvSettings.showVersus;
+
+               if (vsOption.startsWith('pos_')) {
+                   // Comparación por POSICIÓN DE CAMPO (P1 a P6 en rotación actual)
+                   const posIdx = Math.max(0, Math.min(5, parseInt(vsOption.replace('pos_', '')) - 1));
+                   pA = match.rotationA[posIdx] || teamA.players[posIdx] || teamA.players[0];
+                   pB = match.rotationB[posIdx] || teamB.players[posIdx] || teamB.players[0];
+               } else {
+                   // Comparación por ROL / POSICIÓN TÁCTICA (Armador, Opuesto, Punta, Central, Líbero)
+                   // "no importa si no está en juego" -> Se busca en toda la plantilla (titulares + banca)
+                   const normalizeRole = (r?: string) => {
+                       if (!r) return '';
+                       const lr = r.toLowerCase();
+                       if (lr.includes('armad') || lr.includes('sett')) return 'armador';
+                       if (lr.includes('opuest') || lr.includes('oppo')) return 'opuesto';
+                       if (lr.includes('punt') || lr.includes('recep') || lr.includes('outs')) return 'punta';
+                       if (lr.includes('centr') || lr.includes('midd')) return 'central';
+                       if (lr.includes('liber')) return 'libero';
+                       return lr;
+                   };
+
+                   const targetNorm = normalizeRole(vsOption);
+                   let candidatesA = teamA.players.filter(p => normalizeRole(p.role) === targetNorm);
+                   let candidatesB = teamB.players.filter(p => normalizeRole(p.role) === targetNorm);
+                   
+                   // Si hay varios del mismo rol, priorizar al que tenga más puntos anotados
+                   candidatesA.sort((a,b) => (scoresA[b.id]?.pts || 0) - (scoresA[a.id]?.pts || 0));
+                   candidatesB.sort((a,b) => (scoresB[b.id]?.pts || 0) - (scoresB[a.id]?.pts || 0));
+                   
+                   pA = candidatesA[0] || teamA.players[0];
+                   pB = candidatesB[0] || teamB.players[0];
+               }
           } else {
               pA = activeTvSettings.featuredPlayerId ? teamA.players.find(p => p.id === activeTvSettings?.featuredPlayerId) : undefined;
               if (!pA) {
@@ -1585,7 +1549,18 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
               }
           }
 
+          // Selección manual explícita de jugadores para un Versus más preciso
+          if (activeTvSettings.versusPlayerAId) {
+              const explicitA = teamA.players.find(p => p.id === activeTvSettings.versusPlayerAId);
+              if (explicitA) pA = explicitA;
+          }
+          if (activeTvSettings.versusPlayerBId) {
+              const explicitB = teamB.players.find(p => p.id === activeTvSettings.versusPlayerBId);
+              if (explicitB) pB = explicitB;
+          }
+
           if (!pA || !pB) return null;
+
 
           const stA = scoresA[pA.id] || {pts:0,att:0,blk:0,srv:0,attTot:1};
           const stB = scoresB[pB.id] || {pts:0,att:0,blk:0,srv:0,attTot:1};
@@ -1768,13 +1743,16 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
       {activeTvSettings?.featuredPlayerId && activeTvSettings.featuredPlayerMode === 'presentation' && (
           <div className="fixed inset-0 z-50 pointer-events-none flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in zoom-in duration-500">
              {(() => {
-                 const player = match.rotationA.find(p => p.id === activeTvSettings!.featuredPlayerId) || 
+                 const player = teamA.players.find(p => p.id === activeTvSettings!.featuredPlayerId) || 
+                                teamB.players.find(p => p.id === activeTvSettings!.featuredPlayerId) ||
+                                match.rotationA.find(p => p.id === activeTvSettings!.featuredPlayerId) || 
                                 match.benchA.find(p => p.id === activeTvSettings!.featuredPlayerId) || 
                                 match.rotationB.find(p => p.id === activeTvSettings!.featuredPlayerId) || 
                                 match.benchB.find(p => p.id === activeTvSettings!.featuredPlayerId);
                  if (!player) return null;
                  
-                 const pTeam = [...match.rotationA, ...match.benchA].some(p => p.id === player.id) ? teamA : teamB;
+                 const pTeam = teamA.players.some(p => p.id === player.id) ? teamA : teamB;
+
                  const isPresentation = activeTvSettings.featuredPlayerMode === 'presentation';
 
                  // Calculate simplistic stats
@@ -2453,39 +2431,86 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
             const isLeftTeamActive = (isSelectedTeamA && !swapSides) || (isSelectedTeamB && swapSides);
             const isRightTeamActive = (isSelectedTeamB && !swapSides) || (isSelectedTeamA && swapSides);
 
-            const activeTeamQuickStats = activeStatTeam ? (() => {
-                const history = match.sets.flatMap(s => s.history || []).filter(h => h.teamId === activeStatTeam.id);
+            // Helper para calcular estadísticas en tiempo real y jugadores en juego
+            const getTeamDetailedStats = (targetTeam: Team, onCourtRotation: Player[]) => {
+                const history = match.sets.flatMap(s => s.history || []).filter(h => h.teamId === targetTeam.id);
                 const totalPts = match.sets.reduce((sum, s) => {
-                    return sum + (activeStatTeam.id === teamA.id ? s.scoreA : s.scoreB);
-                }, 0) + (activeStatTeam.id === teamA.id ? match.scoreA : match.scoreB);
+                    return sum + (targetTeam.id === teamA.id ? s.scoreA : s.scoreB);
+                }, 0) + (targetTeam.id === teamA.id ? match.scoreA : match.scoreB);
 
                 const attacks = history.filter(h => h.type === 'attack').length;
-                const oppErrors = match.sets.flatMap(s => s.history || []).filter(h => h.teamId !== activeStatTeam.id && h.type === 'opponent_error').length;
+                const oppErrors = match.sets.flatMap(s => s.history || []).filter(h => h.teamId !== targetTeam.id && h.type === 'opponent_error').length;
                 const attackTot = attacks + oppErrors;
                 const attackPct = attackTot > 0 ? Math.round((attacks / attackTot) * 100) : 0;
-                
                 const blocks = history.filter(h => h.type === 'block').length;
                 const aces = history.filter(h => h.type === 'ace').length;
 
-                const pScores: Record<string, number> = {};
-                history.filter(h => ['attack', 'block', 'ace'].includes(h.type)).forEach(h => {
-                    if (h.playerId) pScores[h.playerId] = (pScores[h.playerId] || 0) + 1;
+                // Conteo de puntos por jugador
+                const pScores: Record<string, { pts: number, att: number, blk: number, ace: number }> = {};
+                history.forEach(h => {
+                    if (h.playerId) {
+                        if (!pScores[h.playerId]) pScores[h.playerId] = { pts: 0, att: 0, blk: 0, ace: 0 };
+                        if (['attack', 'block', 'ace'].includes(h.type)) pScores[h.playerId].pts++;
+                        if (h.type === 'attack') pScores[h.playerId].att++;
+                        if (h.type === 'block') pScores[h.playerId].blk++;
+                        if (h.type === 'ace') pScores[h.playerId].ace++;
+                    }
                 });
+
+                // Jugadores actualmente en cancha (rotación) con datos reales
+                const inCourt = (onCourtRotation || []).slice(0, 6).map(p => ({
+                    player: p,
+                    stats: pScores[p.id] || { pts: 0, att: 0, blk: 0, ace: 0 }
+                }));
+
+                // Jugador destacado seleccionado por el operador para este equipo
+                const targetFeaturedId = targetTeam.id === teamA.id 
+                    ? (activeTvSettings?.featuredPlayerAId || (activeTvSettings?.featuredPlayerId && teamA.players.some(p => p.id === activeTvSettings.featuredPlayerId) ? activeTvSettings.featuredPlayerId : undefined))
+                    : (activeTvSettings?.featuredPlayerBId || (activeTvSettings?.featuredPlayerId && teamB.players.some(p => p.id === activeTvSettings.featuredPlayerId) ? activeTvSettings.featuredPlayerId : undefined));
+
+                const featured = targetFeaturedId 
+                    ? targetTeam.players.find(p => p.id === targetFeaturedId)
+                    : null;
+                const featuredStats = featured ? (pScores[featured.id] || { pts: 0, att: 0, blk: 0, ace: 0 }) : null;
+
+
+                // Jugador con más puntos del equipo
                 let topPId = '';
                 let topPts = 0;
-                Object.entries(pScores).forEach(([pId, pts]) => {
-                    if (pts > topPts) { topPts = pts; topPId = pId; }
+                Object.entries(pScores).forEach(([pId, st]) => {
+                    if (st.pts > topPts) { topPts = st.pts; topPId = pId; }
                 });
-                const topPlayer = activeStatTeam.players.find(p => p.id === topPId);
+                const topPlayer = targetTeam.players.find(p => p.id === topPId);
 
-                return { totalPts, attacks, attackPct, blocks, aces, topPlayer, topPts };
-            })() : null;
+                return { totalPts, attacks, attackPct, blocks, aces, inCourt, featured, featuredStats, topPlayer, topPts };
+            };
+
+            const leftTeam = swapSides ? teamB : teamA;
+            const rightTeam = swapSides ? teamA : teamB;
+            const leftRotation = swapSides ? match.rotationB : match.rotationA;
+            const rightRotation = swapSides ? match.rotationA : match.rotationB;
+
+            const isTeamASelected = activeTvSettings?.showTeamStats === true || 
+                                    activeTvSettings?.showTeamStats === teamA.id || 
+                                    activeTvSettings?.showTeamStats === 'team_a' || 
+                                    activeTvSettings?.showTeamStats === 'EQ_A';
+
+            const isTeamBSelected = activeTvSettings?.showTeamStats === true || 
+                                    activeTvSettings?.showTeamStats === teamB.id || 
+                                    activeTvSettings?.showTeamStats === 'team_b' || 
+                                    activeTvSettings?.showTeamStats === 'EQ_B';
+
+            const showLeftWing = (leftTeam.id === teamA.id && isTeamASelected) || (leftTeam.id === teamB.id && isTeamBSelected);
+            const showRightWing = (rightTeam.id === teamA.id && isTeamASelected) || (rightTeam.id === teamB.id && isTeamBSelected);
+
+            const leftStats = showLeftWing ? getTeamDetailedStats(leftTeam, leftRotation) : null;
+            const rightStats = showRightWing ? getTeamDetailedStats(rightTeam, rightRotation) : null;
 
             return (
               <div className={`relative z-10 transition-all duration-300
                   ${isVertical 
                       ? 'absolute top-0 left-0 h-full w-40 md:w-48 flex items-center justify-center pointer-events-none' 
-                      : 'absolute bottom-4 md:bottom-7 left-1/2 -translate-x-1/2 w-full max-w-[760px] md:max-w-[800px] px-2 md:px-3 pointer-events-none scale-90 sm:scale-95 lg:scale-100 flex justify-center origin-bottom'
+                      : 'absolute bottom-3 md:bottom-5 left-1/2 -translate-x-1/2 w-full max-w-[480px] sm:max-w-[520px] md:max-w-[560px] px-2 pointer-events-none scale-90 sm:scale-95 lg:scale-100 flex justify-center origin-bottom'
                   }
               `}
               style={(boardAnim === 'in' || boardAnim === 'out') ? {
@@ -2497,27 +2522,27 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
                   
                   <div className={`bg-transparent rounded-none overflow-visible flex flex-col items-center pointer-events-auto shrink-0 relative
                       ${isVertical 
-                          ? 'rotate-90 origin-center w-[58vh] max-w-none h-12 md:h-14 shadow-[0_25px_50px_rgba(0,0,0,0.85)]' 
-                          : 'w-full h-11 md:h-13 shadow-[0_25px_50px_rgba(0,0,0,0.85)]'
+                          ? 'rotate-90 origin-center w-[58vh] max-w-none h-11 md:h-12 shadow-[0_25px_50px_rgba(0,0,0,0.85)]' 
+                          : 'w-full h-11 md:h-12 shadow-[0_25px_50px_rgba(0,0,0,0.85)]'
                       }
                   `}>
-                      {/* Top Tab for Tournament Name */}
-                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 bg-gradient-to-r from-slate-950/95 via-[#0b1022]/95 to-slate-950/95 rounded-t-xl px-5 md:px-10 py-1 md:py-1.5 flex items-center gap-2.5 text-white font-black text-[10px] md:text-xs tracking-[0.25em] shadow-2xl border-t border-x border-white/15">
-                         <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse shadow-[0_0_8px_#ef4444]"></div>
-                         <span className="truncate max-w-[200px] md:max-w-[400px]">{tournament?.name || "LIGA PROFESIONAL"}</span>
-                         <span className="text-white/30 text-[9px]">|</span>
-                         <span className="text-cyan-400 text-[9px] md:text-[10px] font-bold">SET {match.currentSet}</span>
+                      {/* Pestaña superior del torneo */}
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 bg-gradient-to-r from-slate-950/95 via-[#0b1022]/95 to-slate-950/95 rounded-t-xl px-4 md:px-7 py-0.5 md:py-1 flex items-center gap-2 text-white font-black text-[9px] md:text-[10px] tracking-[0.2em] shadow-xl border-t border-x border-white/15">
+                         <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse shadow-[0_0_6px_#ef4444]"></div>
+                         <span className="truncate max-w-[150px] md:max-w-[280px]">{tournament?.name || "LIGA PROFESIONAL"}</span>
+                         <span className="text-white/30 text-[8px]">|</span>
+                         <span className="text-cyan-400 text-[8px] md:text-[9px] font-bold">SET {match.currentSet}</span>
                       </div>
                       
                       {/* Set Point / Match Point Banner */}
                       {pointBanner && (
-                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-7 z-50 pointer-events-none flex flex-col items-center justify-center animate-in slide-in-from-bottom-5 duration-500">
-                               <div className="bg-gradient-to-t from-black/95 to-black/75 backdrop-blur-md px-12 md:px-24 py-3 md:py-5 rounded-t-[1.5rem] border-t-4 border-x border-white/20 shadow-[0_-20px_50px_rgba(0,0,0,0.7)]" style={{ borderTopColor: pointBanner.color }}>
-                                   <h1 className="text-4xl md:text-6xl font-black text-white italic uppercase tracking-[0.15em] drop-shadow-lg" style={{ color: pointBanner.color }}>
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-6 z-50 pointer-events-none flex flex-col items-center justify-center animate-in slide-in-from-bottom-5 duration-500">
+                               <div className="bg-gradient-to-t from-black/95 to-black/75 backdrop-blur-md px-8 md:px-16 py-2 md:py-3.5 rounded-t-[1.25rem] border-t-4 border-x border-white/20 shadow-[0_-20px_50px_rgba(0,0,0,0.7)]" style={{ borderTopColor: pointBanner.color }}>
+                                   <h1 className="text-3xl md:text-5xl font-black text-white italic uppercase tracking-[0.15em] drop-shadow-lg" style={{ color: pointBanner.color }}>
                                        {pointBanner.text}
                                    </h1>
-                                   <div className="mt-1 flex justify-center">
-                                       <div className="text-white/90 font-bold uppercase tracking-[0.2em] text-xs md:text-sm bg-white/10 px-4 py-1 rounded-full border border-white/10">
+                                   <div className="mt-0.5 flex justify-center">
+                                       <div className="text-white/90 font-bold uppercase tracking-[0.2em] text-[10px] md:text-xs bg-white/10 px-3 py-0.5 rounded-full border border-white/10">
                                            {pointBanner.text === 'MATCH POINT' ? 'PUNTO DE PARTIDO' : 'PUNTO DE SET'}
                                        </div>
                                    </div>
@@ -2525,135 +2550,264 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
                           </div>
                       )}
 
-                      {/* Team Statistics HUD Banner when EQ. A or EQ. B is selected */}
-                      {activeStatTeam && !isVertical && (
-                          <div className={`absolute bottom-full mb-3 z-40 animate-in slide-in-from-bottom-3 fade-in duration-300 w-full sm:w-[48%] min-w-[300px] max-w-[390px] ${
-                              isLeftTeamActive ? 'left-0' : 'right-0'
-                          }`}>
-                              <div className={`p-3 rounded-2xl border-2 backdrop-blur-xl shadow-2xl flex flex-col gap-2 ${
-                                  activeStatTeam.id === teamA.id
-                                      ? 'bg-gradient-to-br from-[#0c1a36]/95 via-[#081226]/95 to-[#040814]/95 border-cyan-400/80 shadow-[0_0_25px_rgba(34,211,238,0.4)]'
-                                      : 'bg-gradient-to-br from-[#2e1026]/95 via-[#1c0917]/95 to-[#0a0308]/95 border-rose-400/80 shadow-[0_0_25px_rgba(244,63,94,0.4)]'
+                      {/* --- ALA LATERAL IZQUIERDA (EQ. A / EQUIPO IZQUIERDO AL COSTADO DEL MARCADOR) --- */}
+                      {showLeftWing && leftStats && !isVertical && (
+                          <div className="absolute right-[100%] mr-2 sm:mr-3 bottom-0 w-48 sm:w-56 md:w-60 z-30 pointer-events-auto animate-in slide-in-from-right-3 fade-in duration-300">
+                              <div className={`p-2 sm:p-2.5 rounded-2xl border-2 backdrop-blur-xl shadow-2xl flex flex-col gap-1.5 ${
+                                  leftTeam.id === teamA.id
+                                      ? 'bg-gradient-to-br from-[#0a162e]/95 via-[#071022]/95 to-[#040814]/95 border-cyan-400/80 shadow-[0_0_20px_rgba(34,211,238,0.35)]'
+                                      : 'bg-gradient-to-br from-[#280c20]/95 via-[#180814]/95 to-[#090307]/95 border-rose-400/80 shadow-[0_0_20px_rgba(244,63,94,0.35)]'
                               }`}>
-                                  {/* Header */}
-                                  <div className="flex items-center justify-between border-b border-white/10 pb-1.5">
-                                      <div className="flex items-center gap-2 min-w-0">
-                                          {activeStatTeam.logoUrl ? (
-                                              <img src={activeStatTeam.logoUrl} className="w-7 h-7 object-contain rounded-lg bg-black/50 p-0.5 border border-white/10 shrink-0" alt="" />
+                                  {/* Encabezado del Ala */}
+                                  <div className="flex items-center justify-between border-b border-white/10 pb-1">
+                                      <div className="flex items-center gap-1.5 min-w-0">
+                                          {leftTeam.logoUrl ? (
+                                              <img src={leftTeam.logoUrl} className="w-6 h-6 object-contain rounded-md bg-black/50 p-0.5 border border-white/10 shrink-0" alt="" />
                                           ) : (
-                                              <div className="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center font-black text-xs text-white shrink-0">
-                                                  {activeStatTeam.name[0]}
+                                              <div className="w-6 h-6 rounded-md bg-white/10 flex items-center justify-center font-black text-[10px] text-white shrink-0">
+                                                  {leftTeam.name[0]}
                                               </div>
                                           )}
                                           <div className="min-w-0">
-                                              <div className="flex items-center gap-1.5">
-                                                  <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider ${
-                                                      activeStatTeam.id === teamA.id ? 'bg-cyan-500/30 text-cyan-300 border border-cyan-400/40' : 'bg-rose-500/30 text-rose-300 border border-rose-400/40'
-                                                  }`}>
-                                                      {activeStatTeam.id === teamA.id ? 'EQ. A' : 'EQ. B'}
-                                                  </span>
-                                                  <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">ESTADÍSTICAS OFICIALES</span>
-                                              </div>
-                                              <h3 className="text-white font-black text-xs md:text-sm uppercase tracking-wider truncate">
-                                                  {activeStatTeam.name}
+                                              <span className={`px-1 py-0.5 rounded text-[7px] font-black uppercase tracking-wider block leading-none w-fit mb-0.5 ${
+                                                  leftTeam.id === teamA.id ? 'bg-cyan-500/30 text-cyan-300 border border-cyan-400/40' : 'bg-rose-500/30 text-rose-300 border border-rose-400/40'
+                                              }`}>
+                                                  {leftTeam.id === teamA.id ? 'EQ. A' : 'EQ. B'}
+                                              </span>
+                                              <h3 className="text-white font-black text-[11px] md:text-xs uppercase tracking-wider truncate">
+                                                  {leftTeam.name}
                                               </h3>
                                           </div>
                                       </div>
                                       <div className="text-right shrink-0">
-                                          <span className="text-[8px] text-slate-400 uppercase font-mono block leading-none">PUNTOS</span>
-                                          <span className={`text-base font-mono font-black ${activeStatTeam.id === teamA.id ? 'text-cyan-300' : 'text-rose-400'}`}>
-                                              {activeTeamQuickStats?.totalPts ?? 0}
+                                          <span className="text-[7px] text-slate-400 uppercase font-mono block leading-none">PTS</span>
+                                          <span className={`text-sm md:text-base font-mono font-black ${leftTeam.id === teamA.id ? 'text-cyan-300' : 'text-rose-400'}`}>
+                                              {leftStats.totalPts}
                                           </span>
                                       </div>
                                   </div>
 
-                                  {/* Stat Metrics Grid */}
-                                  <div className="grid grid-cols-3 gap-1.5 text-center">
-                                      <div className="bg-black/50 rounded-xl p-1.5 border border-white/5">
-                                          <div className="text-[8px] text-slate-400 uppercase font-bold">Ataque</div>
-                                          <div className="text-xs font-mono font-black text-white">
-                                              {activeTeamQuickStats?.attacks ?? 0} <span className="text-[9px] text-slate-400 font-normal">({activeTeamQuickStats?.attackPct ?? 0}%)</span>
+                                  {/* Métricas Principales */}
+                                  <div className="grid grid-cols-3 gap-1 text-center">
+                                      <div className="bg-black/50 rounded-lg p-1 border border-white/5">
+                                          <div className="text-[7px] text-slate-400 uppercase font-bold">Ataque</div>
+                                          <div className="text-[10px] font-mono font-black text-white">
+                                              {leftStats.attacks} <span className="text-[8px] text-slate-400 font-normal">({leftStats.attackPct}%)</span>
                                           </div>
                                       </div>
-                                      <div className="bg-black/50 rounded-xl p-1.5 border border-white/5">
-                                          <div className="text-[8px] text-slate-400 uppercase font-bold">Bloqueos</div>
-                                          <div className="text-xs font-mono font-black text-amber-300">
-                                              {activeTeamQuickStats?.blocks ?? 0} pts
+                                      <div className="bg-black/50 rounded-lg p-1 border border-white/5">
+                                          <div className="text-[7px] text-slate-400 uppercase font-bold">Bloqueo</div>
+                                          <div className="text-[10px] font-mono font-black text-amber-300">
+                                              {leftStats.blocks}
                                           </div>
                                       </div>
-                                      <div className="bg-black/50 rounded-xl p-1.5 border border-white/5">
-                                          <div className="text-[8px] text-slate-400 uppercase font-bold">Saque (Aces)</div>
-                                          <div className="text-xs font-mono font-black text-emerald-400">
-                                              {activeTeamQuickStats?.aces ?? 0} pts
+                                      <div className="bg-black/50 rounded-lg p-1 border border-white/5">
+                                          <div className="text-[7px] text-slate-400 uppercase font-bold">Aces</div>
+                                          <div className="text-[10px] font-mono font-black text-emerald-400">
+                                              {leftStats.aces}
                                           </div>
                                       </div>
                                   </div>
 
-                                  {/* Top Scorer Banner */}
-                                  {activeTeamQuickStats?.topPlayer && (
-                                      <div className="flex items-center justify-between bg-white/5 px-2.5 py-1 rounded-xl text-[10px] border border-white/5">
-                                          <span className="text-slate-400 font-bold uppercase tracking-wider">Top Anotador:</span>
-                                          <span className="text-white font-black uppercase truncate ml-2">
-                                              #{activeTeamQuickStats.topPlayer.number} {activeTeamQuickStats.topPlayer.name} ({activeTeamQuickStats.topPts} pts)
-                                          </span>
+                                  {/* Jugadores en Cancha / Jugador Seleccionado */}
+                                  <div className="flex flex-col gap-0.5 bg-black/40 rounded-lg p-1 border border-white/5 max-h-[140px] overflow-y-auto">
+                                      <div className="flex justify-between items-center px-1 text-[7px] font-black text-slate-400 uppercase tracking-widest border-b border-white/5 pb-0.5">
+                                          <span>EN JUEGO (SET {match.currentSet})</span>
+                                          <span>PTS</span>
+                                      </div>
+                                      {leftStats.inCourt.map(({ player, stats }) => {
+                                          const isFeat = leftStats.featured?.id === player.id;
+                                          return (
+                                              <div 
+                                                  key={player.id} 
+                                                  className={`flex items-center justify-between px-1 py-0.5 rounded text-[8px] transition-colors ${
+                                                      isFeat ? 'bg-cyan-500/25 border border-cyan-400/40 text-cyan-200 font-black' : 'hover:bg-white/5 text-slate-200'
+                                                  }`}
+                                              >
+                                                  <div className="flex items-center gap-1 min-w-0">
+                                                      <span className="font-mono text-[7px] text-slate-400 font-bold shrink-0">#{player.number}</span>
+                                                      <span className="truncate uppercase font-bold">{player.name.split(' ')[0]}</span>
+                                                      {isFeat && <span className="text-[6px] bg-cyan-400 text-slate-950 px-1 rounded font-black">★</span>}
+                                                  </div>
+                                                  <span className="font-mono font-black shrink-0 text-white">
+                                                      {stats.pts}
+                                                  </span>
+                                              </div>
+                                          );
+                                      })}
+                                  </div>
+
+                                  {/* Destacado / Top Anotador */}
+                                  {leftStats.featured ? (
+                                      <div className="bg-cyan-500/20 border border-cyan-400/30 px-1.5 py-0.5 rounded-lg text-[8px] flex items-center justify-between text-cyan-300">
+                                          <span className="font-black uppercase truncate">★ #{leftStats.featured.number} {leftStats.featured.name}</span>
+                                          <span className="font-mono font-bold shrink-0">{leftStats.featuredStats?.pts || 0} pts</span>
+                                      </div>
+                                  ) : leftStats.topPlayer && (
+                                      <div className="bg-white/5 px-1.5 py-0.5 rounded-lg text-[8px] flex items-center justify-between text-slate-300 border border-white/5">
+                                          <span className="text-slate-400 uppercase font-bold truncate">Top: #{leftStats.topPlayer.number} {leftStats.topPlayer.name}</span>
+                                          <span className="font-mono font-black text-amber-300 shrink-0">{leftStats.topPts} pts</span>
                                       </div>
                                   )}
                               </div>
                           </div>
                       )}
 
+                      {/* --- ALA LATERAL DERECHA (EQ. B / EQUIPO DERECHO AL COSTADO DEL MARCADOR) --- */}
+                      {showRightWing && rightStats && !isVertical && (
+                          <div className="absolute left-[100%] ml-2 sm:ml-3 bottom-0 w-48 sm:w-56 md:w-60 z-30 pointer-events-auto animate-in slide-in-from-left-3 fade-in duration-300">
+                              <div className={`p-2 sm:p-2.5 rounded-2xl border-2 backdrop-blur-xl shadow-2xl flex flex-col gap-1.5 ${
+                                  rightTeam.id === teamB.id
+                                      ? 'bg-gradient-to-br from-[#280c20]/95 via-[#180814]/95 to-[#090307]/95 border-rose-400/80 shadow-[0_0_20px_rgba(244,63,94,0.35)]'
+                                      : 'bg-gradient-to-br from-[#0a162e]/95 via-[#071022]/95 to-[#040814]/95 border-cyan-400/80 shadow-[0_0_20px_rgba(34,211,238,0.35)]'
+                              }`}>
+                                  {/* Encabezado del Ala */}
+                                  <div className="flex items-center justify-between border-b border-white/10 pb-1">
+                                      <div className="flex items-center gap-1.5 min-w-0">
+                                          {rightTeam.logoUrl ? (
+                                              <img src={rightTeam.logoUrl} className="w-6 h-6 object-contain rounded-md bg-black/50 p-0.5 border border-white/10 shrink-0" alt="" />
+                                          ) : (
+                                              <div className="w-6 h-6 rounded-md bg-white/10 flex items-center justify-center font-black text-[10px] text-white shrink-0">
+                                                  {rightTeam.name[0]}
+                                              </div>
+                                          )}
+                                          <div className="min-w-0">
+                                              <span className={`px-1 py-0.5 rounded text-[7px] font-black uppercase tracking-wider block leading-none w-fit mb-0.5 ${
+                                                  rightTeam.id === teamB.id ? 'bg-rose-500/30 text-rose-300 border border-rose-400/40' : 'bg-cyan-500/30 text-cyan-300 border border-cyan-400/40'
+                                              }`}>
+                                                  {rightTeam.id === teamB.id ? 'EQ. B' : 'EQ. A'}
+                                              </span>
+                                              <h3 className="text-white font-black text-[11px] md:text-xs uppercase tracking-wider truncate">
+                                                  {rightTeam.name}
+                                              </h3>
+                                          </div>
+                                      </div>
+                                      <div className="text-right shrink-0">
+                                          <span className="text-[7px] text-slate-400 uppercase font-mono block leading-none">PTS</span>
+                                          <span className={`text-sm md:text-base font-mono font-black ${rightTeam.id === teamB.id ? 'text-rose-400' : 'text-cyan-300'}`}>
+                                              {rightStats.totalPts}
+                                          </span>
+                                      </div>
+                                  </div>
+
+                                  {/* Métricas Principales */}
+                                  <div className="grid grid-cols-3 gap-1 text-center">
+                                      <div className="bg-black/50 rounded-lg p-1 border border-white/5">
+                                          <div className="text-[7px] text-slate-400 uppercase font-bold">Ataque</div>
+                                          <div className="text-[10px] font-mono font-black text-white">
+                                              {rightStats.attacks} <span className="text-[8px] text-slate-400 font-normal">({rightStats.attackPct}%)</span>
+                                          </div>
+                                      </div>
+                                      <div className="bg-black/50 rounded-lg p-1 border border-white/5">
+                                          <div className="text-[7px] text-slate-400 uppercase font-bold">Bloqueo</div>
+                                          <div className="text-[10px] font-mono font-black text-amber-300">
+                                              {rightStats.blocks}
+                                          </div>
+                                      </div>
+                                      <div className="bg-black/50 rounded-lg p-1 border border-white/5">
+                                          <div className="text-[7px] text-slate-400 uppercase font-bold">Aces</div>
+                                          <div className="text-[10px] font-mono font-black text-emerald-400">
+                                              {rightStats.aces}
+                                          </div>
+                                      </div>
+                                  </div>
+
+                                  {/* Jugadores en Cancha / Jugador Seleccionado */}
+                                  <div className="flex flex-col gap-0.5 bg-black/40 rounded-lg p-1 border border-white/5 max-h-[140px] overflow-y-auto">
+                                      <div className="flex justify-between items-center px-1 text-[7px] font-black text-slate-400 uppercase tracking-widest border-b border-white/5 pb-0.5">
+                                          <span>EN JUEGO (SET {match.currentSet})</span>
+                                          <span>PTS</span>
+                                      </div>
+                                      {rightStats.inCourt.map(({ player, stats }) => {
+                                          const isFeat = rightStats.featured?.id === player.id;
+                                          return (
+                                              <div 
+                                                  key={player.id} 
+                                                  className={`flex items-center justify-between px-1 py-0.5 rounded text-[8px] transition-colors ${
+                                                      isFeat ? 'bg-rose-500/25 border border-rose-400/40 text-rose-200 font-black' : 'hover:bg-white/5 text-slate-200'
+                                                  }`}
+                                              >
+                                                  <div className="flex items-center gap-1 min-w-0">
+                                                      <span className="font-mono text-[7px] text-slate-400 font-bold shrink-0">#{player.number}</span>
+                                                      <span className="truncate uppercase font-bold">{player.name.split(' ')[0]}</span>
+                                                      {isFeat && <span className="text-[6px] bg-rose-500 text-white px-1 rounded font-black">★</span>}
+                                                  </div>
+                                                  <span className="font-mono font-black shrink-0 text-white">
+                                                      {stats.pts}
+                                                  </span>
+                                              </div>
+                                          );
+                                      })}
+                                  </div>
+
+                                  {/* Destacado / Top Anotador */}
+                                  {rightStats.featured ? (
+                                      <div className="bg-rose-500/20 border border-rose-400/30 px-1.5 py-0.5 rounded-lg text-[8px] flex items-center justify-between text-rose-300">
+                                          <span className="font-black uppercase truncate">★ #{rightStats.featured.number} {rightStats.featured.name}</span>
+                                          <span className="font-mono font-bold shrink-0">{rightStats.featuredStats?.pts || 0} pts</span>
+                                      </div>
+                                  ) : rightStats.topPlayer && (
+                                      <div className="bg-white/5 px-1.5 py-0.5 rounded-lg text-[8px] flex items-center justify-between text-slate-300 border border-white/5">
+                                          <span className="text-slate-400 uppercase font-bold truncate">Top: #{rightStats.topPlayer.number} {rightStats.topPlayer.name}</span>
+                                          <span className="font-mono font-black text-amber-300 shrink-0">{rightStats.topPts} pts</span>
+                                      </div>
+                                  )}
+                              </div>
+                          </div>
+                      )}
+
+                      {/* --- CUERPO CENTRAL DEL MARCADOR TV (COMPACTO Y ELEGANTE) --- */}
                       <div className="w-full h-full flex rounded-xl shadow-2xl overflow-hidden font-sans border border-white/15 backdrop-blur-xl">
                           
-                          {/* Team A/Left Section */}
-                          <div className={`flex-1 flex items-center justify-between pl-2 md:pl-4 pr-0 bg-gradient-to-r from-slate-950/95 via-[#0e172e]/95 to-[#162347]/95 transition-all duration-300 ${
-                              isLeftTeamActive ? 'ring-2 ring-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.5)] z-20' : ''
-                          }`} style={{ borderLeft: `5px solid ${swapSides ? '#f43f5e' : '#38bdf8'}` }}>
+                          {/* Equipo Izquierdo (Team A / B según swapSides) */}
+                          <div className={`flex-1 flex items-center justify-between pl-2 md:pl-3 pr-0 bg-gradient-to-r from-slate-950/95 via-[#0e172e]/95 to-[#162347]/95 transition-all duration-300 ${
+                              showLeftWing ? 'ring-2 ring-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.5)] z-20' : ''
+                          }`} style={{ borderLeft: `4px solid ${swapSides ? '#f43f5e' : '#38bdf8'}` }}>
                               <div className="flex flex-row items-center flex-1 min-w-0">
-                                  {/* Logo & Serve */}
-                                  <div className="bg-black/50 border border-white/10 rounded-lg relative flex-shrink-0 flex items-center justify-center w-7 h-7 md:w-11 md:h-11 mr-2 md:mr-3 p-1 shadow-md">
-                                      {(swapSides ? teamB : teamA).logoUrl ? (
-                                          <img src={(swapSides ? teamB : teamA).logoUrl} className="w-full h-full object-contain" />
+                                  {/* Logo */}
+                                  <div className="bg-black/50 border border-white/10 rounded-lg relative flex-shrink-0 flex items-center justify-center w-7 h-7 md:w-9 md:h-9 mr-1.5 md:mr-2 p-1 shadow-md">
+                                      {leftTeam.logoUrl ? (
+                                          <img src={leftTeam.logoUrl} className="w-full h-full object-contain" alt="" />
                                       ) : (
-                                          <div className="w-full h-full bg-cyan-950/60 rounded flex items-center justify-center text-cyan-300 font-black text-xs md:text-sm">
-                                              {(swapSides ? teamB : teamA).name[0]}
+                                          <div className="w-full h-full bg-cyan-950/60 rounded flex items-center justify-center text-cyan-300 font-black text-xs">
+                                              {leftTeam.name[0]}
                                           </div>
                                       )}
                                   </div>
 
-                                  {/* Name & Sets Won */}
-                                  <div className="flex-1 min-w-0 pr-2">
-                                      <div className="flex items-center gap-2">
-                                          <span className={`px-1.5 py-0.5 rounded text-[8px] md:text-[9px] font-black tracking-wider uppercase shrink-0 border ${
+                                  {/* Nombre, Etiqueta y Sets */}
+                                  <div className="flex-1 min-w-0 pr-1">
+                                      <div className="flex items-center gap-1.5">
+                                          <span className={`px-1 py-0.2 rounded text-[7px] md:text-[8px] font-black tracking-wider uppercase shrink-0 border ${
                                               swapSides 
                                                   ? 'bg-rose-500/25 text-rose-300 border-rose-400/40' 
                                                   : 'bg-cyan-500/25 text-cyan-300 border-cyan-400/40'
                                           }`}>
                                               {swapSides ? 'EQ. B' : 'EQ. A'}
                                           </span>
-                                          <h2 className={`text-white font-black uppercase tracking-wider truncate drop-shadow-md ${isVertical ? 'text-xs md:text-sm' : 'text-xs md:text-base lg:text-lg'}`}>
-                                              {(swapSides ? teamB : teamA).name}
+                                          <h2 className="text-white font-black uppercase tracking-wider truncate drop-shadow-md text-[11px] sm:text-xs md:text-sm">
+                                              {leftTeam.name}
                                           </h2>
                                           {(swapSides ? match.servingTeamId === teamB.id : match.servingTeamId === teamA.id) && (
-                                              <div className="flex items-center gap-1 bg-cyan-400 text-slate-950 font-black text-[7px] md:text-[9px] px-1.5 py-0.5 rounded shadow-[0_0_8px_rgba(34,211,238,0.8)] animate-pulse shrink-0">
+                                              <div className="flex items-center gap-0.5 bg-cyan-400 text-slate-950 font-black text-[7px] md:text-[8px] px-1 py-0.2 rounded shadow-[0_0_6px_rgba(34,211,238,0.8)] animate-pulse shrink-0">
                                                   <span>🏐</span>
-                                                  <span className="hidden sm:inline">SAQUE</span>
                                               </div>
                                           )}
                                       </div>
                                       
-                                      {/* Set Dots & Timeouts */}
-                                      <div className="flex items-center gap-1.5 mt-0.5 md:mt-1">
+                                      {/* Dots de Sets y Tiempos */}
+                                      <div className="flex items-center gap-1 mt-0.5">
                                           {Array.from({length: requiredWins}).map((_, i) => (
                                               <div 
                                                   key={i} 
-                                                  className={`w-3.5 md:w-5 h-1.5 md:h-2 rounded-sm transition-all duration-300 ${
+                                                  className={`w-3 md:w-4 h-1 md:h-1.5 rounded-sm transition-all duration-300 ${
                                                       i < (swapSides ? winsB : winsA) 
-                                                          ? 'bg-cyan-400 shadow-[0_0_8px_#22d3ee]' 
+                                                          ? 'bg-cyan-400 shadow-[0_0_6px_#22d3ee]' 
                                                           : 'bg-white/10 border border-white/5'
                                                   }`}
                                               />
                                           ))}
-                                          <span className="text-[7px] md:text-[9px] text-slate-400 font-bold ml-1 tracking-wider">
+                                          <span className="text-[7px] md:text-[8px] text-slate-400 font-bold ml-1 font-mono">
                                               {swapSides 
                                                   ? `T:${match.timeoutsB || 0}/2 • S:${match.substitutionsB || 0}/6` 
                                                   : `T:${match.timeoutsA || 0}/2 • S:${match.substitutionsA || 0}/6`
@@ -2663,57 +2817,56 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
                                   </div>
                               </div>
 
-                              {/* Score Box */}
-                              <div className="bg-gradient-to-b from-[#060810] to-[#0c1322] h-full flex items-center justify-center px-4 md:px-7 border-l border-white/10 border-r border-[#080d1a] shadow-inner shrink-0">
-                                  <span className={`font-mono font-black tabular-nums tracking-tighter leading-none text-cyan-300 drop-shadow-[0_0_15px_rgba(34,211,238,0.4)] ${isVertical ? 'text-2xl md:text-4xl' : 'text-3xl md:text-5xl'}`}>
+                              {/* Puntos Equipo Izquierdo */}
+                              <div className="bg-gradient-to-b from-[#060810] to-[#0c1322] h-full flex items-center justify-center px-3 md:px-5 border-l border-white/10 border-r border-[#080d1a] shadow-inner shrink-0">
+                                  <span className="font-mono font-black tabular-nums tracking-tighter leading-none text-cyan-300 drop-shadow-[0_0_12px_rgba(34,211,238,0.4)] text-2xl md:text-3xl">
                                       {swapSides ? match.scoreB : match.scoreA}
                                   </span>
                               </div>
                           </div>
 
-                          {/* Center Info - Set Capsule */}
-                          <div className="flex flex-col items-center justify-center z-10 relative flex-shrink-0 bg-[#090d1c] w-16 md:w-28 h-full p-1.5 border-x border-white/15 shadow-inner">
-                              <div className="text-[9px] md:text-[11px] font-black italic uppercase tracking-wider text-amber-300 bg-amber-400/15 px-2 py-0.5 rounded border border-amber-400/30 shadow-[0_0_8px_rgba(251,191,36,0.25)] text-center leading-none mb-1">
+                          {/* Centro del Marcador - SET / Torneo */}
+                          <div className="flex flex-col items-center justify-center z-10 relative flex-shrink-0 bg-[#090d1c] w-12 md:w-16 h-full p-1 border-x border-white/15 shadow-inner">
+                              <div className="text-[8px] md:text-[9px] font-black italic uppercase tracking-wider text-amber-300 bg-amber-400/15 px-1.5 py-0.2 rounded border border-amber-400/30 shadow-[0_0_6px_rgba(251,191,36,0.25)] text-center leading-none mb-0.5">
                                   SET {match.currentSet}
                               </div>
                               {tournament?.logoUrl ? (
-                                  <img src={tournament.logoUrl} className="h-6 md:h-8 w-full object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]" />
+                                  <img src={tournament.logoUrl} className="h-5 md:h-6 w-full object-contain drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]" alt="" />
                               ) : (
-                                  <div className="text-[8px] md:text-[9px] text-white/50 font-black uppercase tracking-widest text-center leading-none">
+                                  <div className="text-[7px] md:text-[8px] text-white/50 font-black uppercase tracking-widest text-center leading-none">
                                       VS
                                   </div>
                               )}
                           </div>
 
-                          {/* Team B/Right Section */}
-                          <div className={`flex-1 flex items-center justify-between pr-2 md:pr-4 pl-0 bg-gradient-to-l from-slate-950/95 via-[#241324]/95 to-[#331733]/95 flex-row-reverse transition-all duration-300 ${
-                              isRightTeamActive ? 'ring-2 ring-rose-400 shadow-[0_0_20px_rgba(244,63,94,0.5)] z-20' : ''
-                          }`} style={{ borderRight: `5px solid ${swapSides ? '#38bdf8' : '#f43f5e'}` }}>
+                          {/* Equipo Derecho (Team B / A según swapSides) */}
+                          <div className={`flex-1 flex items-center justify-between pr-2 md:pr-3 pl-0 bg-gradient-to-l from-slate-950/95 via-[#241324]/95 to-[#331733]/95 flex-row-reverse transition-all duration-300 ${
+                              showRightWing ? 'ring-2 ring-rose-400 shadow-[0_0_15px_rgba(244,63,94,0.5)] z-20' : ''
+                          }`} style={{ borderRight: `4px solid ${swapSides ? '#38bdf8' : '#f43f5e'}` }}>
                               <div className="flex flex-row-reverse items-center flex-1 min-w-0">
-                                  {/* Logo & Serve */}
-                                  <div className="bg-black/50 border border-white/10 rounded-lg relative flex-shrink-0 flex items-center justify-center w-7 h-7 md:w-11 md:h-11 ml-2 md:ml-3 p-1 shadow-md">
-                                      {(swapSides ? teamA : teamB).logoUrl ? (
-                                          <img src={(swapSides ? teamA : teamB).logoUrl} className="w-full h-full object-contain" />
+                                  {/* Logo */}
+                                  <div className="bg-black/50 border border-white/10 rounded-lg relative flex-shrink-0 flex items-center justify-center w-7 h-7 md:w-9 md:h-9 ml-1.5 md:ml-2 p-1 shadow-md">
+                                      {rightTeam.logoUrl ? (
+                                          <img src={rightTeam.logoUrl} className="w-full h-full object-contain" alt="" />
                                       ) : (
-                                          <div className="w-full h-full bg-rose-950/60 rounded flex items-center justify-center text-rose-300 font-black text-xs md:text-sm">
-                                              {(swapSides ? teamA : teamB).name[0]}
+                                          <div className="w-full h-full bg-rose-950/60 rounded flex items-center justify-center text-rose-300 font-black text-xs">
+                                              {rightTeam.name[0]}
                                           </div>
                                       )}
                                   </div>
 
-                                  {/* Name & Sets Won */}
-                                  <div className="flex-1 min-w-0 pl-2 flex flex-col items-end">
-                                      <div className="flex items-center gap-2 justify-end">
+                                  {/* Nombre, Etiqueta y Sets */}
+                                  <div className="flex-1 min-w-0 pl-1 flex flex-col items-end">
+                                      <div className="flex items-center gap-1.5 justify-end">
                                           {(swapSides ? match.servingTeamId === teamA.id : match.servingTeamId === teamB.id) && (
-                                              <div className="flex items-center gap-1 bg-rose-500 text-white font-black text-[7px] md:text-[9px] px-1.5 py-0.5 rounded shadow-[0_0_8px_rgba(244,63,94,0.8)] animate-pulse shrink-0">
+                                              <div className="flex items-center gap-0.5 bg-rose-500 text-white font-black text-[7px] md:text-[8px] px-1 py-0.2 rounded shadow-[0_0_6px_rgba(244,63,94,0.8)] animate-pulse shrink-0">
                                                   <span>🏐</span>
-                                                  <span className="hidden sm:inline">SAQUE</span>
                                               </div>
                                           )}
-                                          <h2 className={`text-white font-black uppercase tracking-wider truncate drop-shadow-md ${isVertical ? 'text-xs md:text-sm' : 'text-xs md:text-base lg:text-lg'}`}>
-                                              {(swapSides ? teamA : teamB).name}
+                                          <h2 className="text-white font-black uppercase tracking-wider truncate drop-shadow-md text-[11px] sm:text-xs md:text-sm">
+                                              {rightTeam.name}
                                           </h2>
-                                          <span className={`px-1.5 py-0.5 rounded text-[8px] md:text-[9px] font-black tracking-wider uppercase shrink-0 border ${
+                                          <span className={`px-1 py-0.2 rounded text-[7px] md:text-[8px] font-black tracking-wider uppercase shrink-0 border ${
                                               swapSides 
                                                   ? 'bg-cyan-500/25 text-cyan-300 border-cyan-400/40' 
                                                   : 'bg-rose-500/25 text-rose-300 border-rose-400/40'
@@ -2722,9 +2875,9 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
                                           </span>
                                       </div>
                                       
-                                      {/* Set Dots & Timeouts */}
-                                      <div className="flex items-center gap-1.5 mt-0.5 md:mt-1 justify-end">
-                                          <span className="text-[7px] md:text-[9px] text-slate-400 font-bold mr-1 tracking-wider">
+                                      {/* Dots de Sets y Tiempos */}
+                                      <div className="flex items-center gap-1 mt-0.5 justify-end">
+                                          <span className="text-[7px] md:text-[8px] text-slate-400 font-bold mr-1 font-mono">
                                               {swapSides 
                                                   ? `T:${match.timeoutsA || 0}/2 • S:${match.substitutionsA || 0}/6` 
                                                   : `T:${match.timeoutsB || 0}/2 • S:${match.substitutionsB || 0}/6`
@@ -2733,9 +2886,9 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
                                           {Array.from({length: requiredWins}).map((_, i) => (
                                               <div 
                                                   key={i} 
-                                                  className={`w-3.5 md:w-5 h-1.5 md:h-2 rounded-sm transition-all duration-300 ${
+                                                  className={`w-3 md:w-4 h-1 md:h-1.5 rounded-sm transition-all duration-300 ${
                                                       i < (swapSides ? winsA : winsB) 
-                                                          ? 'bg-rose-500 shadow-[0_0_8px_#f43f5e]' 
+                                                          ? 'bg-rose-500 shadow-[0_0_6px_#f43f5e]' 
                                                           : 'bg-white/10 border border-white/5'
                                                   }`}
                                               />
@@ -2744,9 +2897,9 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
                                   </div>
                               </div>
 
-                              {/* Score Box */}
-                              <div className="bg-gradient-to-b from-[#060810] to-[#1c0c1b] h-full flex items-center justify-center px-4 md:px-7 border-r border-white/10 border-l border-[#140813] shadow-inner shrink-0">
-                                  <span className={`font-mono font-black tabular-nums tracking-tighter leading-none text-rose-300 drop-shadow-[0_0_15px_rgba(244,63,94,0.4)] ${isVertical ? 'text-2xl md:text-4xl' : 'text-3xl md:text-5xl'}`}>
+                              {/* Puntos Equipo Derecho */}
+                              <div className="bg-gradient-to-b from-[#060810] to-[#1c0c1b] h-full flex items-center justify-center px-3 md:px-5 border-r border-white/10 border-l border-[#140813] shadow-inner shrink-0">
+                                  <span className="font-mono font-black tabular-nums tracking-tighter leading-none text-rose-300 drop-shadow-[0_0_12px_rgba(244,63,94,0.4)] text-2xl md:text-3xl">
                                       {swapSides ? match.scoreA : match.scoreB}
                                   </span>
                               </div>
@@ -2757,6 +2910,7 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
               </div>
             );
           })()
+
       )}
 
       {/* --- CONTROLS OVERLAY --- */}
@@ -2809,275 +2963,11 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
           </div>
       )}
 
-      {/* --- ADMIN VAR & MULTI-CÁMARA DASHBOARD CONTROL PANEL --- */}
-      {showUI && !isViewer && showVarDashboard && (
-          <div className="absolute right-6 bottom-6 z-50 bg-slate-950/95 border border-white/10 backdrop-blur-xl rounded-2xl shadow-2xl p-4 md:p-6 flex flex-col gap-4 max-w-sm md:max-w-md w-full absolute text-white animate-in slide-in-from-right-10 duration-300 max-h-[80vh] overflow-y-auto">
-              {/* Header */}
-              <div className="flex items-center justify-between border-b border-white/5 pb-3">
-                  <div className="flex items-center gap-2">
-                      <span className="text-lg">🎥</span>
-                      <div>
-                          <h4 className="text-sm font-black uppercase tracking-widest text-slate-100">Consola VAR</h4>
-                          <p className="text-[10px] text-slate-400 font-mono">ID: {match.matchId}</p>
-                      </div>
-                  </div>
-                  <button 
-                      onClick={() => setShowVarDashboard(false)}
-                      className="text-slate-400 hover:text-white text-xs font-bold bg-white/5 hover:bg-white/10 px-2.5 py-1.5 rounded-lg transition-all"
-                  >
-                      Ocultar
-                  </button>
-              </div>
+      {/* Consola VAR y enrutamiento de cámaras se gestionan exclusivamente desde el Panel de Control (VARConsole) */}
 
-              {/* Camera Miniature Grid */}
-              <div className="flex flex-col gap-2">
-                  <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Cámaras en vivo ({cameras.length})</span>
-                      <button 
-                          onClick={() => setShowQRModal(true)}
-                          className="text-[9px] bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 font-bold px-2 py-1 rounded border border-blue-500/10 flex items-center gap-1 transition-all"
-                      >
-                          <span>📱</span> Enlazar Celular
-                      </button>
-                  </div>
-                  
-                  <div className="grid grid-cols-3 gap-2">
-                      {cameras.map(cam => (
-                          <CameraMiniature 
-                              key={cam.id}
-                              camera={cam}
-                              localStream={videoRef.current?.srcObject as MediaStream | null}
-                              isActive={replayActive && activeReplayCamId === cam.id}
-                              onSelect={() => {
-                                  setActiveReplayCamId(cam.id);
-                                  if (!replayActive) {
-                                      // Trigger replay automatically when a camera thumbnail is clicked!
-                                      setReplayActive(true);
-                                      setReplayPlaying(false);
-                                      setReplayPlayhead(50); // Seek to a nice default action spot
-                                  }
-                              }}
-                          />
-                      ))}
-                  </div>
-              </div>
 
-              {/* Replay Controls Box */}
-              <div className="bg-black/40 border border-white/5 rounded-xl p-3.5 flex flex-col gap-3">
-                  {replayActive ? (
-                      /* Active Replay Controls */
-                      <div className="flex flex-col gap-3">
-                          <div className="flex items-center justify-between">
-                              <span className="text-[10px] bg-red-600 text-white font-black px-2 py-0.5 rounded font-mono uppercase tracking-widest">
-                                  MODO REPETICIÓN
-                              </span>
-                              <button 
-                                  onClick={() => {
-                                      setReplayActive(false);
-                                      setReplayPlaying(false);
-                                  }}
-                                  className="text-[10px] bg-white/10 hover:bg-red-600 hover:text-white text-slate-300 font-bold px-2.5 py-1 rounded transition-all uppercase"
-                              >
-                                  ⏹️ Detener
-                              </button>
-                          </div>
 
-                          {/* Seek Scrubber */}
-                          <div className="flex flex-col gap-1.5">
-                              <div className="flex justify-between text-[10px] text-slate-400 font-mono">
-                                  <span>T -8.0s (Iniciación)</span>
-                                  <span className="text-blue-400 font-bold">CUADRO {replayPlayhead + 1}/80</span>
-                                  <span>Vivo (Impacto)</span>
-                              </div>
-                              <input 
-                                  type="range"
-                                  min={0}
-                                  max={79}
-                                  value={replayPlayhead}
-                                  onChange={(e) => {
-                                      setReplayPlayhead(parseInt(e.target.value));
-                                      setReplayPlaying(false); // Pause on scrub for accuracy
-                                  }}
-                                  className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-red-500"
-                              />
-                          </div>
 
-                          {/* Playback controls row */}
-                          <div className="flex items-center justify-between gap-2 mt-1">
-                              <button 
-                                  onClick={() => setReplayPlaying(!replayPlaying)}
-                                  className={`flex-1 ${replayPlaying ? 'bg-amber-600 hover:bg-amber-500' : 'bg-green-600 hover:bg-green-500'} text-white font-bold text-xs py-2 rounded-lg transition-all uppercase tracking-wider flex items-center justify-center gap-1.5`}
-                              >
-                                  <span>{replayPlaying ? '⏸️ Pausar' : '▶️ Reproducir'}</span>
-                              </button>
-                              
-                              <div className="flex gap-1">
-                                  {[0.25, 0.5, 0.75, 1.0].map(speed => (
-                                      <button
-                                          key={speed}
-                                          onClick={() => setReplaySpeed(speed)}
-                                          className={`px-2.5 py-1.5 rounded-md text-[9px] font-black font-mono transition-all ${
-                                              replaySpeed === speed ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'
-                                          }`}
-                                      >
-                                          {speed * 100}%
-                                      </button>
-                                  ))}
-                              </div>
-                          </div>
-
-                          {/* Action Label Selector */}
-                          <div className="flex flex-col gap-1 mt-1">
-                              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Etiqueta de Repetición</span>
-                              <div className="grid grid-cols-2 gap-1">
-                                  {['DESAFÍO VAR', 'REPETICIÓN ATAQUE', 'REPETICIÓN SAQUE', 'OJO DE HALCÓN'].map(lbl => (
-                                      <button
-                                          key={lbl}
-                                          onClick={() => setReplayTypeLabel(lbl)}
-                                          className={`py-1 rounded text-[9px] font-bold uppercase transition-all ${
-                                              replayTypeLabel === lbl ? 'bg-white/10 text-white border border-white/20' : 'bg-transparent text-slate-500 hover:text-slate-300'
-                                          }`}
-                                      >
-                                          {lbl}
-                                      </button>
-                                  ))}
-                              </div>
-                          </div>
-                      </div>
-                  ) : (
-                      /* Launch Replay Panel */
-                      <div className="flex flex-col gap-2.5">
-                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Lanzar Repetición Instantánea</span>
-                          
-                          <button 
-                              onClick={() => {
-                                  setReplayPlayhead(0);
-                                  setReplayActive(true);
-                                  setReplayPlaying(true);
-                                  setReplaySpeed(0.5); // Default 50% slow-mo
-                              }}
-                              className="w-full bg-red-600 hover:bg-red-500 text-white text-xs font-black py-3 rounded-lg uppercase tracking-wider transition-all transform hover:scale-[1.02] flex items-center justify-center gap-2 shadow-lg shadow-red-500/10"
-                          >
-                              <span>🔴</span> REPETICIÓN CÁMARA LENTA (8s)
-                          </button>
-
-                          <div className="grid grid-cols-2 gap-1.5 mt-1">
-                              <button 
-                                  onClick={() => {
-                                      setActiveReplayCamId('sim_halcon');
-                                      setReplayPlayhead(0);
-                                      setReplayActive(true);
-                                      setReplayPlaying(true);
-                                      setReplayTypeLabel('OJO DE HALCÓN');
-                                  }}
-                                  className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-[10px] font-bold py-2 rounded-lg transition-all"
-                              >
-                                  🔎 OJO DE HALCÓN
-                              </button>
-                              <button 
-                                  onClick={() => {
-                                      setActiveReplayCamId('sim_red');
-                                      setReplayPlayhead(30);
-                                      setReplayActive(true);
-                                      setReplayPlaying(true);
-                                      setReplayTypeLabel('REPETICIÓN ATAQUE');
-                                  }}
-                                  className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-[10px] font-bold py-2 rounded-lg transition-all"
-                              >
-                                  🏐 REPETIR ATAQUE
-                              </button>
-                          </div>
-                      </div>
-                  )}
-              </div>
-          </div>
-      )}
-
-      {/* --- CELL PHONE WIRELESS LINK MODAL --- */}
-      {showQRModal && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 md:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
-              <div className="bg-[#0f172a] border border-cyan-500/30 rounded-3xl max-w-md w-full p-5 md:p-6 text-white flex flex-col gap-4 shadow-[0_25px_60px_rgba(0,0,0,0.9)] relative max-h-[92vh] overflow-y-auto">
-                  <button 
-                      onClick={() => setShowQRModal(false)}
-                      className="absolute top-4 right-4 text-slate-400 hover:text-white text-base w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center transition-all"
-                  >
-                      ✕
-                  </button>
-
-                  <div className="text-center flex flex-col items-center gap-1.5 pt-1">
-                      <div className="bg-cyan-500/20 border border-cyan-400/40 p-3 rounded-2xl text-cyan-400 shadow-md">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                          </svg>
-                      </div>
-                      <h3 className="text-lg font-black uppercase tracking-wider text-white">Conectar Celular (Cámara VAR)</h3>
-                      <p className="text-xs text-slate-400 max-w-xs leading-relaxed">
-                        Escanea el código QR con tu celular para enlazar la cámara en vivo a la consola de repeticiones.
-                      </p>
-                  </div>
-
-                  {/* QR Code and Direct Link */}
-                  <div className="bg-black/60 border border-white/10 rounded-2xl p-4 flex flex-col items-center gap-3">
-                      <div className="bg-white p-3 rounded-2xl shadow-xl flex items-center justify-center">
-                          <QRCodeSVG 
-                              value={getVarDirectUrl(match.matchId)} 
-                              size={160}
-                              level="M"
-                              includeMargin={false}
-                          />
-                      </div>
-                      
-                      <div className="w-full flex flex-col gap-1 text-center">
-                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Código del Partido (Match ID):</span>
-                          <div className="bg-slate-900 border border-cyan-400/30 rounded-xl py-1.5 px-3 font-mono font-black text-cyan-300 tracking-widest text-base uppercase shadow-inner">
-                              {match.matchId}
-                          </div>
-                      </div>
-
-                      {/* Estado en vivo de cámaras conectadas */}
-                      <div className={`w-full py-2 px-3 rounded-xl border flex items-center justify-center gap-2 text-xs font-bold transition-all ${
-                          wirelessCams.length > 0 
-                              ? 'bg-green-500/20 border-green-500/40 text-green-300' 
-                              : 'bg-yellow-500/10 border-yellow-500/30 text-yellow-300'
-                      }`}>
-                          <span className={`w-2.5 h-2.5 rounded-full ${wirelessCams.length > 0 ? 'bg-green-400 animate-ping' : 'bg-yellow-400 animate-pulse'}`}></span>
-                          <span>{wirelessCams.length > 0 ? `¡${wirelessCams.length} Celular(es) Conectado(s)!` : 'Esperando conexión del celular...'}</span>
-                      </div>
-                  </div>
-
-                  {/* Pasos rápidos */}
-                  <div className="bg-slate-900/60 border border-white/5 rounded-xl p-3 text-[11px] text-slate-300 flex flex-col gap-1">
-                      <p className="font-bold text-white uppercase text-[10px] tracking-wider mb-0.5">Pasos para conectar:</p>
-                      <p>1. Escanea el código QR con la cámara de tu celular.</p>
-                      <p>2. Abre el enlace en el navegador del teléfono.</p>
-                      <p>3. Acepta el permiso de la cámara y pulsa <strong className="text-cyan-400">"Conectar y Transmitir"</strong>.</p>
-                  </div>
-
-                  <div className="flex flex-col gap-2">
-                      <button 
-                          onClick={() => {
-                              const url = getVarDirectUrl(match.matchId);
-                              if (navigator.clipboard) {
-                                  navigator.clipboard.writeText(url);
-                                  setCopiedLink(true);
-                                  setTimeout(() => setCopiedLink(false), 2500);
-                              }
-                          }}
-                          className="w-full bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 text-xs font-bold py-2.5 rounded-xl uppercase transition-all flex items-center justify-center gap-2 border border-white/10"
-                      >
-                          <span>{copiedLink ? '✅' : '📋'}</span> {copiedLink ? '¡Enlace Directo Copiado al Portapapeles!' : 'Copiar Enlace Directo para Celular'}
-                      </button>
-
-                      <button 
-                          onClick={() => setShowQRModal(false)}
-                          className="w-full bg-cyan-500 hover:bg-cyan-400 active:scale-95 text-slate-950 text-xs font-black py-3 rounded-xl uppercase tracking-wider transition-all shadow-lg shadow-cyan-500/25"
-                      >
-                          Listo, Continuar Partido
-                      </button>
-                  </div>
-              </div>
-          </div>
-      )}
 
     </div>
   );

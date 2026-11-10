@@ -1705,32 +1705,10 @@ export const App: React.FC = () => {
                                                 Predicción Set
                                             </button>
                                             <button 
-                                                onClick={() => {
-                                                    updateLiveMatch(prev => {
-                                                        if (!prev) return null;
-                                                        const fix = activeTournament.fixtures?.find(f => f.id === prev.matchId);
-                                                        const teamAId = fix?.teamAId || '';
-                                                        const isA = prev.tvSettings?.showTeamStats === teamAId;
-                                                        return {...prev, tvSettings: {...(prev.tvSettings || {style:'horizontal'}), showTeamStats: isA ? false : teamAId}};
-                                                    });
-                                                }} 
-                                                className={`px-3 py-1 rounded text-[10px] font-bold uppercase tracking-widest transition ${liveMatch.tvSettings?.showTeamStats === activeTournament.fixtures?.find(f => f.id === liveMatch.matchId)?.teamAId ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-400'}`}
+                                                onClick={() => updateLiveMatch(prev => prev ? {...prev, tvSettings: {...(prev.tvSettings || {style:'horizontal'}), showWinPrediction: !(prev.tvSettings?.showWinPrediction)}} : null)} 
+                                                className={`px-3 py-1 rounded text-[10px] font-bold uppercase tracking-widest transition ${liveMatch.tvSettings?.showWinPrediction ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-400'}`}
                                             >
-                                                Eq. A
-                                            </button>
-                                            <button 
-                                                onClick={() => {
-                                                    updateLiveMatch(prev => {
-                                                        if (!prev) return null;
-                                                        const fix = activeTournament.fixtures?.find(f => f.id === prev.matchId);
-                                                        const teamBId = fix?.teamBId || '';
-                                                        const isB = prev.tvSettings?.showTeamStats === teamBId;
-                                                        return {...prev, tvSettings: {...(prev.tvSettings || {style:'horizontal'}), showTeamStats: isB ? false : teamBId}};
-                                                    });
-                                                }} 
-                                                className={`px-3 py-1 rounded text-[10px] font-bold uppercase tracking-widest transition ${liveMatch.tvSettings?.showTeamStats === activeTournament.fixtures?.find(f => f.id === liveMatch.matchId)?.teamBId ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-400'}`}
-                                            >
-                                                Eq. B
+                                                Predicción Set
                                             </button>
                                             <button 
                                                 onClick={() => updateLiveMatch(prev => prev ? {...prev, tvSettings: {...(prev.tvSettings || {style:'horizontal'}), showServeSpeed: !(prev.tvSettings?.showServeSpeed)}} : null)} 
@@ -1741,8 +1719,80 @@ export const App: React.FC = () => {
                                         </div>
                                     </div>
 
-                                    <div className="border border-white/10 rounded overflow-hidden">
-                                        <div className="bg-white/5 px-3 py-2 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">
+                                    {/* SECCIÓN 1: ESTADÍSTICAS EQ (ALAS LATERALES TV) CON SELECCIÓN DE JUGADOR */}
+                                    <div className="border border-white/10 rounded overflow-hidden mb-3">
+                                        <div className="bg-white/5 px-3 py-1.5 flex items-center justify-between text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                            <span>Estadísticas en Marcador TV (Alas EQ)</span>
+                                            <span className="text-[9px] text-slate-500 font-mono">Seleccionar jugador</span>
+                                        </div>
+                                        <div className="p-2 space-y-2 bg-black/30">
+                                            {/* Fila Eq. A */}
+                                            <div className="flex items-center gap-2">
+                                                <button 
+                                                    onClick={() => {
+                                                        updateLiveMatch(prev => {
+                                                            if (!prev) return null;
+                                                            const fix = activeTournament.fixtures?.find(f => f.id === prev.matchId);
+                                                            const teamAId = fix?.teamAId || '';
+                                                            const isA = prev.tvSettings?.showTeamStats === teamAId || prev.tvSettings?.showTeamStats === true;
+                                                            return {...prev, tvSettings: {...(prev.tvSettings || {style:'horizontal'}), showTeamStats: isA ? false : teamAId}};
+                                                        });
+                                                    }} 
+                                                    className={`px-3 py-2 rounded text-xs font-black uppercase tracking-wider shrink-0 transition ${liveMatch.tvSettings?.showTeamStats === activeTournament.fixtures?.find(f => f.id === liveMatch.matchId)?.teamAId || liveMatch.tvSettings?.showTeamStats === true ? 'bg-cyan-500 text-slate-950 shadow-[0_0_12px_rgba(34,211,238,0.5)]' : 'bg-slate-800 text-cyan-400 hover:bg-slate-700'}`}
+                                                >
+                                                    Ala EQ. A
+                                                </button>
+                                                <select
+                                                    value={liveMatch.tvSettings?.featuredPlayerAId || ''}
+                                                    onChange={e => {
+                                                        const val = e.target.value;
+                                                        updateLiveMatch(prev => prev ? {...prev, tvSettings: {...(prev.tvSettings || {style:'horizontal'}), featuredPlayerAId: val || undefined}} : null);
+                                                    }}
+                                                    className="flex-1 p-2 bg-black/50 border border-cyan-500/30 text-white text-[11px] font-bold outline-none rounded uppercase focus:border-cyan-400"
+                                                >
+                                                    <option value="">-- Jugador EQ. A (Auto / Top Anotador) --</option>
+                                                    {[...liveMatch.rotationA, ...liveMatch.benchA].sort((p1, p2) => p1.number - p2.number).map(p => (
+                                                        <option key={p.id} value={p.id}>#{p.number} {p.name} ({p.role})</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+
+                                            {/* Fila Eq. B */}
+                                            <div className="flex items-center gap-2">
+                                                <button 
+                                                    onClick={() => {
+                                                        updateLiveMatch(prev => {
+                                                            if (!prev) return null;
+                                                            const fix = activeTournament.fixtures?.find(f => f.id === prev.matchId);
+                                                            const teamBId = fix?.teamBId || '';
+                                                            const isB = prev.tvSettings?.showTeamStats === teamBId || prev.tvSettings?.showTeamStats === true;
+                                                            return {...prev, tvSettings: {...(prev.tvSettings || {style:'horizontal'}), showTeamStats: isB ? false : teamBId}};
+                                                        });
+                                                    }} 
+                                                    className={`px-3 py-2 rounded text-xs font-black uppercase tracking-wider shrink-0 transition ${liveMatch.tvSettings?.showTeamStats === activeTournament.fixtures?.find(f => f.id === liveMatch.matchId)?.teamBId || liveMatch.tvSettings?.showTeamStats === true ? 'bg-rose-500 text-white shadow-[0_0_12px_rgba(244,63,94,0.5)]' : 'bg-slate-800 text-rose-400 hover:bg-slate-700'}`}
+                                                >
+                                                    Ala EQ. B
+                                                </button>
+                                                <select
+                                                    value={liveMatch.tvSettings?.featuredPlayerBId || ''}
+                                                    onChange={e => {
+                                                        const val = e.target.value;
+                                                        updateLiveMatch(prev => prev ? {...prev, tvSettings: {...(prev.tvSettings || {style:'horizontal'}), featuredPlayerBId: val || undefined}} : null);
+                                                    }}
+                                                    className="flex-1 p-2 bg-black/50 border border-rose-500/30 text-white text-[11px] font-bold outline-none rounded uppercase focus:border-rose-400"
+                                                >
+                                                    <option value="">-- Jugador EQ. B (Auto / Top Anotador) --</option>
+                                                    {[...liveMatch.rotationB, ...liveMatch.benchB].sort((p1, p2) => p1.number - p2.number).map(p => (
+                                                        <option key={p.id} value={p.id}>#{p.number} {p.name} ({p.role})</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* HAWK-EYE */}
+                                    <div className="border border-white/10 rounded overflow-hidden mb-3">
+                                        <div className="bg-white/5 px-3 py-1.5 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400">
                                             Hawk-Eye Challenge
                                         </div>
                                         <div className="flex gap-2 p-2">
@@ -1761,69 +1811,183 @@ export const App: React.FC = () => {
                                         </div>
                                     </div>
 
-                                    <div className="mt-4 border border-white/10 rounded overflow-hidden">
-                                        <div className="bg-white/5 px-3 py-2 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">
-                                            Destacar Jugador (TV)
+                                    {/* SECCIÓN 2: VERSUS CARA A CARA POR POSICIÓN Y JUGADOR + LANZAR FOTO */}
+                                    <div className="border border-white/10 rounded overflow-hidden">
+                                        <div className="bg-purple-950/40 px-3 py-2 flex items-center justify-between text-[10px] font-bold uppercase tracking-widest text-purple-300 border-b border-purple-500/20">
+                                            <span className="flex items-center gap-1.5"><span>⚔️</span> Versus Cara a Cara (TV)</span>
+                                            {liveMatch.tvSettings?.showVersus && (
+                                                <span className="bg-purple-600 text-white px-2 py-0.5 rounded text-[8px] font-black animate-pulse">EN VIVO EN TV</span>
+                                            )}
                                         </div>
-                                        <div className="flex flex-col gap-2 p-2">
-                                            <div className="flex gap-2">
+                                        <div className="p-2.5 flex flex-col gap-2.5 bg-black/40">
+                                            {/* 1. Selector de Posición / Filtro */}
+                                            <div className="flex flex-col gap-1">
+                                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                                                    <span>1. Filtrar por Posición o Rol:</span>
+                                                    <span className="text-[8px] text-purple-400 font-mono">Toda la plantilla</span>
+                                                </label>
                                                 <select
-                                                    value={statsPanelTeam}
-                                                    onChange={e => {
-                                                        setStatsPanelTeam(e.target.value);
-                                                        setStatsPanelPlayerId('');
+                                                    value={liveMatch.tvSettings?.versusPositionFilter || (typeof liveMatch.tvSettings?.showVersus === 'string' && liveMatch.tvSettings.showVersus !== 'auto' ? liveMatch.tvSettings.showVersus : '')}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value;
+                                                        updateLiveMatch(prev => {
+                                                            if (!prev) return null;
+                                                            let newA = prev.tvSettings?.versusPlayerAId;
+                                                            let newB = prev.tvSettings?.versusPlayerBId;
+                                                            if (val.startsWith('pos_')) {
+                                                                const pIdx = parseInt(val.replace('pos_', '')) - 1;
+                                                                newA = prev.rotationA[pIdx]?.id || newA;
+                                                                newB = prev.rotationB[pIdx]?.id || newB;
+                                                            } else if (val) {
+                                                                const normalize = (r?: string) => (r || '').toLowerCase();
+                                                                const candA = [...prev.rotationA, ...prev.benchA].find(p => normalize(p.role).includes(val.toLowerCase()));
+                                                                const candB = [...prev.rotationB, ...prev.benchB].find(p => normalize(p.role).includes(val.toLowerCase()));
+                                                                if (candA) newA = candA.id;
+                                                                if (candB) newB = candB.id;
+                                                            }
+                                                            return {
+                                                                ...prev,
+                                                                tvSettings: {
+                                                                    ...(prev.tvSettings || {style:'horizontal'}),
+                                                                    versusPositionFilter: val,
+                                                                    versusPlayerAId: newA,
+                                                                    versusPlayerBId: newB,
+                                                                    showVersus: prev.tvSettings?.showVersus ? (val || true) : false
+                                                                }
+                                                            };
+                                                        });
                                                     }}
-                                                    className="flex-1 p-2 bg-black/40 border border-white/10 text-white text-xs font-bold focus:border-vnl-accent outline-none uppercase"
+                                                    className="p-2 bg-slate-900 border border-white/10 text-white text-xs font-bold outline-none rounded uppercase focus:border-purple-400 cursor-pointer"
                                                 >
-                                                    <option value="team_a">Local (A)</option>
-                                                    <option value="team_b">Visita (B)</option>
-                                                </select>
-                                                <select
-                                                    value={statsPanelPlayerId}
-                                                    onChange={e => setStatsPanelPlayerId(e.target.value)}
-                                                    className="flex-1 p-2 bg-black/40 border border-white/10 text-white text-xs font-bold focus:border-vnl-accent outline-none uppercase"
-                                                >
-                                                    <option value="">-- Jugador --</option>
-                                                    {(statsPanelTeam === 'team_a' ? [...liveMatch.rotationA, ...liveMatch.benchA] : [...liveMatch.rotationB, ...liveMatch.benchB]).sort((p1, p2) => p1.number - p2.number).map(p => (
-                                                        <option key={p.id} value={p.id}>#{p.number} {p.name}</option>
-                                                    ))}
+                                                    <option value="">-- Todos los Jugadores (Manual) --</option>
+                                                    <option value="Armador">Armadores (Setters)</option>
+                                                    <option value="Opuesto">Opuestos (Opposites)</option>
+                                                    <option value="Punta">Puntas Receptores (Outside Hitters)</option>
+                                                    <option value="Central">Centrales (Middle Blockers)</option>
+                                                    <option value="Libero">Líberos</option>
+                                                    <option value="pos_1">Posición 1 (P1 Saque / Zaguero)</option>
+                                                    <option value="pos_2">Posición 2 (P2 Delantero Der)</option>
+                                                    <option value="pos_3">Posición 3 (P3 Central Delantero)</option>
+                                                    <option value="pos_4">Posición 4 (P4 Delantero Izq)</option>
+                                                    <option value="pos_5">Posición 5 (P5 Zaguero Izq)</option>
+                                                    <option value="pos_6">Posición 6 (P6 Zaguero Centro)</option>
                                                 </select>
                                             </div>
-                                            <div className="flex gap-2 mt-1">
-                                                <button
-                                                    onClick={() => updateLiveMatch(prev => prev ? {...prev, tvSettings: {...(prev.tvSettings || {style:'horizontal'}), featuredPlayerId: statsPanelPlayerId, featuredPlayerMode: prev.tvSettings?.featuredPlayerMode === 'presentation' ? null : 'presentation'}} : null)}
-                                                    disabled={!statsPanelPlayerId}
-                                                    className={`flex-1 py-2 rounded text-[10px] font-black uppercase transition disabled:opacity-50 ${liveMatch.tvSettings?.featuredPlayerMode === 'presentation' ? 'bg-vnl-accent text-black shadow-[0_0_15px_rgba(6,182,212,0.5)]' : 'bg-slate-800 text-cyan-400 hover:bg-slate-700'}`}
-                                                >
-                                                    Lanzar Foto
-                                                </button>
-                                                <button
-                                                    onClick={() => updateLiveMatch(prev => prev ? {...prev, tvSettings: {...(prev.tvSettings || {style:'horizontal'}), featuredPlayerId: statsPanelPlayerId, featuredPlayerMode: prev.tvSettings?.featuredPlayerMode === 'stats' ? null : 'stats'}} : null)}
-                                                    disabled={!statsPanelPlayerId}
-                                                    className={`flex-1 py-2 rounded text-[10px] font-black uppercase transition disabled:opacity-50 ${liveMatch.tvSettings?.featuredPlayerMode === 'stats' ? 'bg-orange-500 text-white shadow-[0_0_15px_rgba(249,115,22,0.5)]' : 'bg-slate-800 text-orange-400 hover:bg-slate-700'}`}
-                                                >
-                                                    Al Marcador
-                                                </button>
-                                                <div className="flex-1 relative">
+
+                                            {/* 2. Selección de Jugadores A y B */}
+                                            <div className="grid grid-cols-2 gap-2">
+                                                {/* Jugador EQ A */}
+                                                <div className="flex flex-col gap-1">
+                                                    <label className="text-[9px] font-black text-cyan-400 uppercase tracking-wider flex items-center justify-between">
+                                                        <span>Jugador EQ. A</span>
+                                                    </label>
                                                     <select
-                                                        value={liveMatch.tvSettings?.showVersus ? (typeof liveMatch.tvSettings.showVersus === 'string' ? liveMatch.tvSettings.showVersus : 'auto') : ''}
-                                                        onChange={(e) => {
+                                                        value={liveMatch.tvSettings?.versusPlayerAId || ''}
+                                                        onChange={e => {
                                                             const val = e.target.value;
-                                                            updateLiveMatch(prev => prev ? {...prev, tvSettings: {...(prev.tvSettings || {style:'horizontal'}), showVersus: val === '' ? false : (val === 'auto' ? true : val)}} : null);
+                                                            updateLiveMatch(prev => prev ? {...prev, tvSettings: {...(prev.tvSettings || {style:'horizontal'}), versusPlayerAId: val || undefined}} : null);
                                                         }}
-                                                        className={`w-full py-2 px-1 rounded text-[10px] font-black uppercase transition appearance-none text-center cursor-pointer ${liveMatch.tvSettings?.showVersus ? 'bg-purple-600 text-white shadow-[0_0_15px_rgba(147,51,234,0.5)]' : 'bg-slate-800 text-purple-400 hover:bg-slate-700'}`}
+                                                        className="p-2 bg-slate-900 border border-cyan-500/30 text-white text-[11px] font-bold outline-none rounded uppercase focus:border-cyan-400"
                                                     >
-                                                        <option value="">Off Versus</option>
-                                                        <option value="auto">Vs Auto (Jugador)</option>
-                                                        <option value="Punta">Vs Puntas</option>
-                                                        <option value="Opuesto">Vs Opuestos</option>
-                                                        <option value="Central">Vs Centrales</option>
-                                                        <option value="Libero">Vs Líberos</option>
+                                                        <option value="">-- Auto (Por Posición) --</option>
+                                                        {[...liveMatch.rotationA, ...liveMatch.benchA].sort((p1, p2) => p1.number - p2.number).map(p => (
+                                                            <option key={p.id} value={p.id}>#{p.number} {p.name} ({p.role})</option>
+                                                        ))}
                                                     </select>
+                                                    <button
+                                                        onClick={() => {
+                                                            const targetId = liveMatch.tvSettings?.versusPlayerAId || liveMatch.rotationA[0]?.id;
+                                                            if (!targetId) return;
+                                                            const isCurrent = liveMatch.tvSettings?.featuredPlayerId === targetId && liveMatch.tvSettings?.featuredPlayerMode === 'presentation';
+                                                            updateLiveMatch(prev => prev ? {
+                                                                ...prev, 
+                                                                tvSettings: {
+                                                                    ...(prev.tvSettings || {style:'horizontal'}), 
+                                                                    featuredPlayerId: targetId, 
+                                                                    featuredPlayerMode: isCurrent ? null : 'presentation'
+                                                                }
+                                                            } : null);
+                                                        }}
+                                                        className={`py-1.5 px-2 rounded text-[9px] font-black uppercase transition flex items-center justify-center gap-1 ${
+                                                            liveMatch.tvSettings?.featuredPlayerId === (liveMatch.tvSettings?.versusPlayerAId || liveMatch.rotationA[0]?.id) && liveMatch.tvSettings?.featuredPlayerMode === 'presentation'
+                                                                ? 'bg-cyan-500 text-slate-950 shadow-[0_0_10px_rgba(34,211,238,0.5)]'
+                                                                : 'bg-slate-800 text-cyan-300 hover:bg-slate-700'
+                                                        }`}
+                                                    >
+                                                        <span>📸</span> Lanzar Foto A
+                                                    </button>
+                                                </div>
+
+                                                {/* Jugador EQ B */}
+                                                <div className="flex flex-col gap-1">
+                                                    <label className="text-[9px] font-black text-rose-400 uppercase tracking-wider flex items-center justify-between">
+                                                        <span>Jugador EQ. B</span>
+                                                    </label>
+                                                    <select
+                                                        value={liveMatch.tvSettings?.versusPlayerBId || ''}
+                                                        onChange={e => {
+                                                            const val = e.target.value;
+                                                            updateLiveMatch(prev => prev ? {...prev, tvSettings: {...(prev.tvSettings || {style:'horizontal'}), versusPlayerBId: val || undefined}} : null);
+                                                        }}
+                                                        className="p-2 bg-slate-900 border border-rose-500/30 text-white text-[11px] font-bold outline-none rounded uppercase focus:border-rose-400"
+                                                    >
+                                                        <option value="">-- Auto (Por Posición) --</option>
+                                                        {[...liveMatch.rotationB, ...liveMatch.benchB].sort((p1, p2) => p1.number - p2.number).map(p => (
+                                                            <option key={p.id} value={p.id}>#{p.number} {p.name} ({p.role})</option>
+                                                        ))}
+                                                    </select>
+                                                    <button
+                                                        onClick={() => {
+                                                            const targetId = liveMatch.tvSettings?.versusPlayerBId || liveMatch.rotationB[0]?.id;
+                                                            if (!targetId) return;
+                                                            const isCurrent = liveMatch.tvSettings?.featuredPlayerId === targetId && liveMatch.tvSettings?.featuredPlayerMode === 'presentation';
+                                                            updateLiveMatch(prev => prev ? {
+                                                                ...prev, 
+                                                                tvSettings: {
+                                                                    ...(prev.tvSettings || {style:'horizontal'}), 
+                                                                    featuredPlayerId: targetId, 
+                                                                    featuredPlayerMode: isCurrent ? null : 'presentation'
+                                                                }
+                                                            } : null);
+                                                        }}
+                                                        className={`py-1.5 px-2 rounded text-[9px] font-black uppercase transition flex items-center justify-center gap-1 ${
+                                                            liveMatch.tvSettings?.featuredPlayerId === (liveMatch.tvSettings?.versusPlayerBId || liveMatch.rotationB[0]?.id) && liveMatch.tvSettings?.featuredPlayerMode === 'presentation'
+                                                                ? 'bg-rose-500 text-white shadow-[0_0_10px_rgba(244,63,94,0.5)]'
+                                                                : 'bg-slate-800 text-rose-300 hover:bg-slate-700'
+                                                        }`}
+                                                    >
+                                                        <span>📸</span> Lanzar Foto B
+                                                    </button>
                                                 </div>
                                             </div>
+
+                                            {/* Botón Principal para Activar / Desactivar Versus en TV */}
+                                            <button
+                                                onClick={() => {
+                                                    updateLiveMatch(prev => {
+                                                        if (!prev) return null;
+                                                        const isVs = !!prev.tvSettings?.showVersus;
+                                                        const filterVal = prev.tvSettings?.versusPositionFilter || 'auto';
+                                                        return {
+                                                            ...prev,
+                                                            tvSettings: {
+                                                                ...(prev.tvSettings || {style:'horizontal'}),
+                                                                showVersus: isVs ? false : (filterVal || true)
+                                                            }
+                                                        };
+                                                    });
+                                                }}
+                                                className={`w-full py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition flex items-center justify-center gap-2 shadow-lg ${
+                                                    liveMatch.tvSettings?.showVersus
+                                                        ? 'bg-purple-600 hover:bg-purple-500 text-white shadow-[0_0_20px_rgba(147,51,234,0.6)] animate-pulse'
+                                                        : 'bg-slate-800 hover:bg-slate-700 text-purple-300 border border-purple-500/30'
+                                                }`}
+                                            >
+                                                <span>⚔️</span> {liveMatch.tvSettings?.showVersus ? 'Quitar Versus de TV (Activo)' : 'Lanzar Versus Cara a Cara en TV'}
+                                            </button>
                                         </div>
                                     </div>
+
                                 </div>
                             )}
                             

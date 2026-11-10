@@ -138,8 +138,14 @@ export interface LiveMatchState {
     showPlayerStats?: boolean;
     showTeamStats?: boolean | string;
     featuredPlayerId?: string;
+    featuredPlayerAId?: string;
+    featuredPlayerBId?: string;
     featuredPlayerMode?: 'presentation' | 'stats' | null;
     showVersus?: boolean | string;
+    versusPlayerAId?: string;
+    versusPlayerBId?: string;
+    versusPositionFilter?: string;
+
     showServeSpeed?: boolean;
     triggerSetPoint?: number;
     triggerMatchPoint?: number;

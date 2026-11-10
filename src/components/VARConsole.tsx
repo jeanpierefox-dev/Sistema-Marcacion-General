@@ -41,9 +41,17 @@ export const VARConsole: React.FC<VARConsoleProps> = ({
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(0.25); // Default 25% cámara lenta
   const [playheadIndex, setPlayheadIndex] = useState<number>(0);
   const [zoomLevel, setZoomLevel] = useState<number>(1);
+  const [panOffset, setPanOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [showInspectionCircle, setShowInspectionCircle] = useState<boolean>(false);
+  const [circlePos, setCirclePos] = useState<{ x: number; y: number }>({ x: 320, y: 180 });
+  const [circleRadius, setCircleRadius] = useState<number>(45);
+  const [interactionMode, setInteractionMode] = useState<'pan' | 'circle'>('pan');
   const [hawkEyeIn, setHawkEyeIn] = useState<boolean>(true);
   const [showQRModal, setShowQRModal] = useState<boolean>(false);
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
+
 
   // Configuración de Fuente de Cámara por cada Sección del Challenger
   const [sectionConfigs, setSectionConfigs] = useState<Record<CameraAngleType, { sourceType: 'simulation' | 'webcam' | 'wireless'; wirelessId?: string; label: string }>>({
@@ -399,7 +407,7 @@ export const VARConsole: React.FC<VARConsoleProps> = ({
     ctx.textAlign = 'left';
   };
 
-  // 4. Renderizar frame en el visor principal de la consola según playhead y zoom
+  // 4. Renderizar frame en el visor principal de la consola según playhead, zoom, pan y círculo
   useEffect(() => {
     const canvas = previewCanvasRef.current;
     if (!canvas) return;
@@ -428,19 +436,87 @@ export const VARConsole: React.FC<VARConsoleProps> = ({
     img.onload = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      if (zoomLevel > 1) {
-        // Zoom digital centrado
+      // Dibujar imagen con Zoom y Desplazamiento (Pan)
+      ctx.save();
+      // Trasladar al centro + desplazamiento arrastrable
+      ctx.translate(canvas.width / 2 + panOffset.x, canvas.height / 2 + panOffset.y);
+      ctx.scale(zoomLevel, zoomLevel);
+      ctx.translate(-canvas.width / 2, -canvas.height / 2);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      ctx.restore();
+
+      // Dibujar CÍRCULO RETÍCULA DEL DESAFÍO (Herramienta de precisión arbitral)
+      if (showInspectionCircle) {
+        const cx = circlePos.x;
+        const cy = circlePos.y;
+        const r = circleRadius;
+
         ctx.save();
-        ctx.translate(canvas.width / 2, canvas.height / 2);
-        ctx.scale(zoomLevel, zoomLevel);
-        ctx.translate(-canvas.width / 2, -canvas.height / 2);
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        // Resplandor exterior
+        ctx.shadowColor = 'rgba(239, 68, 68, 0.8)';
+        ctx.shadowBlur = 15;
+
+        // Círculo principal rojo/dorado
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([8, 4]);
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Anillo interior sutil
+        ctx.setLineDash([]);
+        ctx.strokeStyle = '#facc15';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r * 0.4, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Punto central de impacto
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath();
+        ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Miras / Cruz de coordenadas
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(cx - r - 8, cy);
+        ctx.lineTo(cx - r * 0.4, cy);
+        ctx.moveTo(cx + r * 0.4, cy);
+        ctx.lineTo(cx + r + 8, cy);
+        ctx.moveTo(cx, cy - r - 8);
+        ctx.lineTo(cx, cy - r * 0.4);
+        ctx.moveTo(cx, cy + r * 0.4);
+        ctx.lineTo(cx, cy + r + 8);
+        ctx.stroke();
+
+        // Etiqueta indicadora
+        ctx.shadowBlur = 0;
+        const tagText = '🎯 ZONA DE REVISIÓN VAR';
+        ctx.font = 'bold 10px monospace';
+        const metrics = ctx.measureText(tagText);
+        const tagW = metrics.width + 14;
+        const tagH = 18;
+        const tagX = cx - tagW / 2;
+        const tagY = cy - r - 24;
+
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+        ctx.beginPath();
+        ctx.roundRect(tagX, tagY, tagW, tagH, 4);
+        ctx.fill();
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        ctx.fillStyle = '#f8fafc';
+        ctx.textAlign = 'center';
+        ctx.fillText(tagText, cx, tagY + 13);
         ctx.restore();
-      } else {
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       }
     };
-  }, [selectedAngle, playheadIndex, zoomLevel, bufferLengths]);
+  }, [selectedAngle, playheadIndex, zoomLevel, panOffset, showInspectionCircle, circlePos, circleRadius, bufferLengths]);
 
   // 5. Animación de reproducción en cámara lenta
   useEffect(() => {
@@ -474,7 +550,19 @@ export const VARConsole: React.FC<VARConsoleProps> = ({
     setIsLiveBroadcast(activate);
     const reqTeam = requestingTeamId === teamA.id ? teamA : teamB;
     const currentList = buffersRef.current[selectedAngle];
-    const currentFrame = currentList.length > 0 ? currentList[Math.min(playheadIndex, currentList.length - 1)]?.dataUrl : undefined;
+    
+    // Captura exacta del lienzo actual (incluye ampliación, desplazamiento y círculo retícula)
+    let currentFrame: string | undefined = undefined;
+    if (previewCanvasRef.current) {
+      try {
+        currentFrame = previewCanvasRef.current.toDataURL('image/jpeg', 0.88);
+      } catch (e) {
+        currentFrame = currentList.length > 0 ? currentList[Math.min(playheadIndex, currentList.length - 1)]?.dataUrl : undefined;
+      }
+    } else {
+      currentFrame = currentList.length > 0 ? currentList[Math.min(playheadIndex, currentList.length - 1)]?.dataUrl : undefined;
+    }
+
     const currentCfg = sectionConfigs[selectedAngle];
 
     const challengePayload: VarChallengeState = {
@@ -505,7 +593,18 @@ export const VARConsole: React.FC<VARConsoleProps> = ({
   const handleSetVerdict = (newVerdict: VarChallengeState['verdict']) => {
     setVerdict(newVerdict);
     const currentList = buffersRef.current[selectedAngle];
-    const currentFrame = currentList.length > 0 ? currentList[Math.min(playheadIndex, currentList.length - 1)]?.dataUrl : undefined;
+    
+    let currentFrame: string | undefined = undefined;
+    if (previewCanvasRef.current) {
+      try {
+        currentFrame = previewCanvasRef.current.toDataURL('image/jpeg', 0.88);
+      } catch (e) {
+        currentFrame = currentList.length > 0 ? currentList[Math.min(playheadIndex, currentList.length - 1)]?.dataUrl : undefined;
+      }
+    } else {
+      currentFrame = currentList.length > 0 ? currentList[Math.min(playheadIndex, currentList.length - 1)]?.dataUrl : undefined;
+    }
+
     const currentCfg = sectionConfigs[selectedAngle];
 
     if (isLiveBroadcast && onUpdateMatch) {
@@ -703,18 +802,159 @@ export const VARConsole: React.FC<VARConsoleProps> = ({
         })}
       </div>
 
-      {/* Visor Principal con Lupa y HUD */}
-      <div className="relative rounded-2xl overflow-hidden border-2 border-white/15 bg-black aspect-video max-h-[380px] shadow-2xl flex items-center justify-center">
+      {/* Barra de Herramientas de Inspección Arbitral: Mover (Pan), Zoom y Círculo */}
+      <div className="flex flex-wrap items-center justify-between gap-2 bg-[#080d19] border border-white/10 rounded-2xl p-2.5">
+        {/* Modos de Interacción */}
+        <div className="flex items-center gap-1.5 bg-black/60 p-1 rounded-xl border border-white/10">
+          <button
+            onClick={() => setInteractionMode('pan')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition ${
+              interactionMode === 'pan' 
+                ? 'bg-cyan-500 text-slate-950 shadow-[0_0_12px_rgba(34,211,238,0.5)]' 
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <span>✋</span> Mover Pantalla
+          </button>
+          <button
+            onClick={() => {
+              setInteractionMode('circle');
+              setShowInspectionCircle(true);
+            }}
+            className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition ${
+              interactionMode === 'circle' && showInspectionCircle
+                ? 'bg-red-600 text-white shadow-[0_0_15px_rgba(239,68,68,0.7)] animate-pulse' 
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <span>🎯</span> Círculo Desafío
+          </button>
+        </div>
+
+        {/* Controles de Círculo Retícula */}
+        {showInspectionCircle && (
+          <div className="flex items-center gap-2 bg-red-950/40 border border-red-500/40 px-3 py-1 rounded-xl">
+            <span className="text-[10px] font-bold text-red-300 uppercase tracking-wider">Tamaño Círculo:</span>
+            {[30, 45, 65].map(rad => (
+              <button
+                key={rad}
+                onClick={() => setCircleRadius(rad)}
+                className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                  circleRadius === rad ? 'bg-red-500 text-white font-black' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                {rad === 30 ? 'P' : rad === 45 ? 'M' : 'G'}
+              </button>
+            ))}
+            <button
+              onClick={() => setShowInspectionCircle(false)}
+              className="text-slate-400 hover:text-red-400 text-xs ml-1 font-bold"
+              title="Quitar círculo"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
+        {/* Controles de Zoom Digital y Reset */}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 bg-black/60 p-1 rounded-xl border border-white/10">
+            {[1, 1.5, 2, 3, 4].map(z => (
+              <button
+                key={z}
+                onClick={() => setZoomLevel(z)}
+                className={`px-2 py-1 rounded text-[10px] font-black transition ${
+                  zoomLevel === z ? 'bg-cyan-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                {z}x
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={() => {
+              setZoomLevel(1);
+              setPanOffset({ x: 0, y: 0 });
+              setShowInspectionCircle(false);
+            }}
+            className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[10px] font-bold px-2.5 py-1.5 rounded-xl border border-white/10 uppercase transition"
+          >
+            🔄 Reset
+          </button>
+        </div>
+      </div>
+
+      {/* Visor Principal con Lupa, Desplazamiento (Pan) y Círculo Retícula */}
+      <div 
+        className={`relative rounded-2xl overflow-hidden border-2 border-white/15 bg-black aspect-video max-h-[380px] shadow-2xl flex items-center justify-center select-none ${
+          interactionMode === 'circle' ? 'cursor-crosshair' : isDragging ? 'cursor-grabbing' : 'cursor-grab'
+        }`}
+        onMouseDown={(e) => {
+          const rect = previewCanvasRef.current?.getBoundingClientRect();
+          if (!rect) return;
+          if (interactionMode === 'circle') {
+            const scaleX = 640 / rect.width;
+            const scaleY = 360 / rect.height;
+            const clickX = Math.round((e.clientX - rect.left) * scaleX);
+            const clickY = Math.round((e.clientY - rect.top) * scaleY);
+            setCirclePos({ x: clickX, y: clickY });
+            setShowInspectionCircle(true);
+          } else {
+            setIsDragging(true);
+            setDragStart({ x: e.clientX, y: e.clientY });
+          }
+        }}
+        onMouseMove={(e) => {
+          if (!isDragging || interactionMode === 'circle') return;
+          const rect = previewCanvasRef.current?.getBoundingClientRect();
+          const scale = rect ? 640 / rect.width : 1;
+          const dx = (e.clientX - dragStart.x) * scale;
+          const dy = (e.clientY - dragStart.y) * scale;
+          setPanOffset(prev => ({ x: prev.x + dx, y: prev.y + dy }));
+          setDragStart({ x: e.clientX, y: e.clientY });
+        }}
+        onMouseUp={() => setIsDragging(false)}
+        onMouseLeave={() => setIsDragging(false)}
+        onTouchStart={(e) => {
+          const touch = e.touches[0];
+          const rect = previewCanvasRef.current?.getBoundingClientRect();
+          if (!rect || !touch) return;
+          if (interactionMode === 'circle') {
+            const scaleX = 640 / rect.width;
+            const scaleY = 360 / rect.height;
+            const touchX = Math.round((touch.clientX - rect.left) * scaleX);
+            const touchY = Math.round((touch.clientY - rect.top) * scaleY);
+            setCirclePos({ x: touchX, y: touchY });
+            setShowInspectionCircle(true);
+          } else {
+            setIsDragging(true);
+            setDragStart({ x: touch.clientX, y: touch.clientY });
+          }
+        }}
+        onTouchMove={(e) => {
+          if (!isDragging || interactionMode === 'circle') return;
+          const touch = e.touches[0];
+          const rect = previewCanvasRef.current?.getBoundingClientRect();
+          if (!rect || !touch) return;
+          const scale = 640 / rect.width;
+          const dx = (touch.clientX - dragStart.x) * scale;
+          const dy = (touch.clientY - dragStart.y) * scale;
+          setPanOffset(prev => ({ x: prev.x + dx, y: prev.y + dy }));
+          setDragStart({ x: touch.clientX, y: touch.clientY });
+        }}
+        onTouchEnd={() => setIsDragging(false)}
+      >
         <canvas 
           ref={previewCanvasRef} 
           width={640} 
           height={360} 
-          className="w-full h-full object-contain"
+          className="w-full h-full object-contain pointer-events-none"
         />
 
         {/* Indicador de Transmisión al En Vivo (TV) */}
         {isLiveBroadcast && (
-          <div className="absolute top-3 left-3 bg-red-600 text-white font-black text-[10px] px-3 py-1 rounded-lg uppercase tracking-widest animate-pulse border border-red-400 shadow-[0_0_15px_rgba(239,68,68,0.7)] flex items-center gap-1.5 z-20">
+          <div className="absolute top-3 left-3 bg-red-600 text-white font-black text-[10px] px-3 py-1 rounded-lg uppercase tracking-widest animate-pulse border border-red-400 shadow-[0_0_15px_rgba(239,68,68,0.7)] flex items-center gap-1.5 z-20 pointer-events-none">
             <span className="w-2 h-2 rounded-full bg-white animate-ping"></span>
             TRANSMITIENDO EN VIVO A LA SEÑAL TV
           </div>
@@ -726,28 +966,6 @@ export const VARConsole: React.FC<VARConsoleProps> = ({
             <img src={tournament.logoUrl} alt="Torneo" className="h-10 md:h-12 object-contain" />
           </div>
         )}
-
-        {/* Controles de Lupa / Zoom Digital sobre el video */}
-        <div className="absolute bottom-3 right-3 z-20 flex gap-1.5 bg-black/70 backdrop-blur p-1 rounded-xl border border-white/20">
-          <button
-            onClick={() => setZoomLevel(1)}
-            className={`px-2 py-0.5 rounded text-[10px] font-black ${zoomLevel === 1 ? 'bg-cyan-500 text-black' : 'text-slate-300'}`}
-          >
-            1x
-          </button>
-          <button
-            onClick={() => setZoomLevel(2)}
-            className={`px-2 py-0.5 rounded text-[10px] font-black ${zoomLevel === 2 ? 'bg-cyan-500 text-black' : 'text-slate-300'}`}
-          >
-            🔍 2x Lupa
-          </button>
-          <button
-            onClick={() => setZoomLevel(3)}
-            className={`px-2 py-0.5 rounded text-[10px] font-black ${zoomLevel === 3 ? 'bg-cyan-500 text-black' : 'text-slate-300'}`}
-          >
-            🔍 3x Zoom
-          </button>
-        </div>
 
         {/* Si el ángulo es Ojo de Halcón, selector directo In / Out */}
         {selectedAngle === 'halcon' && (
@@ -767,7 +985,13 @@ export const VARConsole: React.FC<VARConsoleProps> = ({
             </button>
           </div>
         )}
+
+        {/* Guía informativa interactiva */}
+        <div className="absolute bottom-2.5 right-2.5 z-20 pointer-events-none bg-black/70 backdrop-blur px-2.5 py-1 rounded-xl border border-white/10 text-[9px] font-mono text-slate-300">
+          {interactionMode === 'circle' ? '🎯 Clic en el video para colocar el círculo' : zoomLevel > 1 ? `🔍 Zoom ${zoomLevel}x • Arrastra para mover` : '🔍 Zoom 1x • Arrastra o selecciona modo'}
+        </div>
       </div>
+
 
       {/* Barra de Tiempo del Búfer de 5 Minutos (Scrubbing / Playhead) */}
       <div className="bg-slate-950/80 p-3.5 rounded-2xl border border-white/10 flex flex-col gap-2 shadow-inner">
