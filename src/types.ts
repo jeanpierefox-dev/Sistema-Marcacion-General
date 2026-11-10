@@ -151,6 +151,7 @@ export interface LiveMatchState {
     triggerMatchPoint?: number;
     forceCameraChangeTrigger?: number;
     showFormations?: boolean;
+    showRotationMode?: 'both' | 'teamA' | 'teamB' | null;
     showSetStatsExt?: boolean;
     showMatchStatsExt?: boolean;
     showPointEvolution?: boolean;

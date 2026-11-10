@@ -1102,10 +1102,34 @@ export const App: React.FC = () => {
       setShowRotationModal(null);
   };
 
-  const handleToggleRotationView = () => {
+  const handleToggleRotationView = (targetMode?: 'both' | 'teamA' | 'teamB' | 'off' | unknown) => {
       if (!liveMatch) return;
-      const newState = !liveMatch.showRotation;
-      const updated = { ...liveMatch, showRotation: newState };
+      const isCurrentlyActive = Boolean(liveMatch.showRotation || liveMatch.tvSettings?.showRotationMode);
+      
+      let nextState: boolean;
+      let nextMode: 'both' | 'teamA' | 'teamB' | null;
+
+      if (targetMode === 'off') {
+          nextState = false;
+          nextMode = null;
+      } else if (typeof targetMode === 'string' && ['both', 'teamA', 'teamB'].includes(targetMode)) {
+          nextState = true;
+          nextMode = targetMode as 'both' | 'teamA' | 'teamB';
+      } else {
+          // Default toggle behavior (handles empty or click event)
+          nextState = !isCurrentlyActive;
+          nextMode = nextState ? 'both' : null;
+      }
+
+      const updated = { 
+        ...liveMatch, 
+        showRotation: nextState,
+        tvSettings: {
+          ...(liveMatch.tvSettings || { style: 'horizontal' }),
+          showRotationMode: nextMode,
+          showFormations: nextState
+        }
+      };
       setLiveMatch(updated);
       pushData('liveMatch', updated);
   };
@@ -1665,14 +1689,72 @@ export const App: React.FC = () => {
                                         </button>
                                     </div>
 
-                                    <div className="flex w-full justify-between items-center bg-black/30 rounded p-2 mb-2 border border-white/5">
-                                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Rotación</span>
-                                        <button 
-                                            onClick={() => updateLiveMatch(prev => prev ? {...prev, tvSettings: {...(prev.tvSettings || {style:'horizontal'}), showFormations: !(prev.tvSettings?.showFormations)}} : null)} 
-                                            className={`px-4 py-1.5 rounded text-xs font-bold uppercase tracking-widest transition ${liveMatch.tvSettings?.showFormations ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-400'}`}
-                                        >
-                                            {liveMatch.tvSettings?.showFormations ? 'Activo' : 'Inactivo'}
-                                        </button>
+                                    {/* Rotación Táctica en TV (Detallada con Cancha de Simulación) */}
+                                    <div className="flex flex-col w-full bg-black/40 rounded-xl p-2.5 mb-2 border border-white/10 shadow-md">
+                                        <div className="flex justify-between items-center mb-1.5">
+                                            <span className="text-[11px] font-black text-cyan-300 uppercase tracking-wider flex items-center gap-1.5">
+                                                <span>📋</span> Rotación Táctica (TV)
+                                            </span>
+                                            <span className={`text-[9px] font-mono font-black px-2 py-0.5 rounded uppercase ${
+                                                (liveMatch.showRotation || liveMatch.tvSettings?.showRotationMode)
+                                                    ? "bg-cyan-500/20 text-cyan-300 border border-cyan-400/30"
+                                                    : "bg-white/5 text-slate-400"
+                                            }`}>
+                                                {(() => {
+                                                    if (!liveMatch.showRotation && !liveMatch.tvSettings?.showRotationMode) return "Inactivo";
+                                                    const m = liveMatch.tvSettings?.showRotationMode || "both";
+                                                    if (m === "teamA") return "Solo EQ. A";
+                                                    if (m === "teamB") return "Solo EQ. B";
+                                                    return "Ambos Equipos";
+                                                })()}
+                                            </span>
+                                        </div>
+                                        <div className="grid grid-cols-4 gap-1.5 w-full">
+                                            <button
+                                                onClick={() => handleToggleRotationView("both")}
+                                                className={`py-1.5 px-1 rounded-lg text-[10px] font-black uppercase transition-all flex items-center justify-center gap-1 ${
+                                                    (liveMatch.showRotation || liveMatch.tvSettings?.showRotationMode) && (liveMatch.tvSettings?.showRotationMode === "both" || !liveMatch.tvSettings?.showRotationMode)
+                                                        ? "bg-cyan-500 text-slate-950 shadow-[0_0_12px_rgba(6,182,212,0.4)]"
+                                                        : "bg-white/10 hover:bg-white/20 text-slate-300 border border-white/5"
+                                                }`}
+                                                title="Enviar rotaciones de ambos equipos a TV"
+                                            >
+                                                👥 Ambos
+                                            </button>
+                                            <button
+                                                onClick={() => handleToggleRotationView("teamA")}
+                                                className={`py-1.5 px-1 rounded-lg text-[10px] font-black uppercase transition-all flex items-center justify-center gap-1 ${
+                                                    (liveMatch.showRotation || liveMatch.tvSettings?.showRotationMode) && liveMatch.tvSettings?.showRotationMode === "teamA"
+                                                        ? "bg-cyan-600 text-white shadow-[0_0_12px_rgba(6,182,212,0.5)] border border-cyan-400"
+                                                        : "bg-white/10 hover:bg-white/20 text-slate-300 border border-white/5"
+                                                }`}
+                                                title="Enviar solo rotación del Equipo A a TV"
+                                            >
+                                                🔵 EQ. A
+                                            </button>
+                                            <button
+                                                onClick={() => handleToggleRotationView("teamB")}
+                                                className={`py-1.5 px-1 rounded-lg text-[10px] font-black uppercase transition-all flex items-center justify-center gap-1 ${
+                                                    (liveMatch.showRotation || liveMatch.tvSettings?.showRotationMode) && liveMatch.tvSettings?.showRotationMode === "teamB"
+                                                        ? "bg-rose-600 text-white shadow-[0_0_12px_rgba(244,63,94,0.5)] border border-rose-400"
+                                                        : "bg-white/10 hover:bg-white/20 text-slate-300 border border-white/5"
+                                                }`}
+                                                title="Enviar solo rotación del Equipo B a TV"
+                                            >
+                                                🔴 EQ. B
+                                            </button>
+                                            <button
+                                                onClick={() => handleToggleRotationView("off")}
+                                                className={`py-1.5 px-1 rounded-lg text-[10px] font-bold uppercase transition-all flex items-center justify-center gap-1 ${
+                                                    (!liveMatch.showRotation && !liveMatch.tvSettings?.showRotationMode)
+                                                        ? "bg-slate-800 text-slate-500 cursor-default"
+                                                        : "bg-red-500/20 hover:bg-red-500 text-red-300 hover:text-white border border-red-500/30"
+                                                }`}
+                                                title="Ocultar rotación de la pantalla TV"
+                                            >
+                                                ✕ Quitar
+                                            </button>
+                                        </div>
                                     </div>
 
                                     <div className="flex flex-col w-full justify-center items-center bg-black/30 rounded p-2 mb-4 border border-white/5">
@@ -2022,8 +2104,8 @@ export const App: React.FC = () => {
                                 onRequestSub={initiateSubRequest}
                                 onModifyRotation={initiateRotationCheck}
                                 onSetServe={handleSetServe}
-                                onToggleRotationView={handleToggleRotationView}
-                                showRotationView={liveMatch.showRotation}
+                                onToggleRotationView={() => handleToggleRotationView((liveMatch.showRotation && liveMatch.tvSettings?.showRotationMode === 'teamA') ? 'off' : 'teamA')}
+                                showRotationView={Boolean(liveMatch.showRotation && (liveMatch.tvSettings?.showRotationMode === 'teamA' || liveMatch.tvSettings?.showRotationMode === 'both' || !liveMatch.tvSettings?.showRotationMode))}
                                 teamId={activeTournament.fixtures?.find(f => f.id === liveMatch.matchId)?.teamAId!}
                                 teamName={activeTournament.teams.find(t => t.id === activeTournament.fixtures?.find(f => f.id === liveMatch.matchId)?.teamAId)?.name!}
                                 players={activeTournament.teams.find(t => t.id === activeTournament.fixtures?.find(f => f.id === liveMatch.matchId)?.teamAId)?.players || []}
@@ -2055,8 +2137,8 @@ export const App: React.FC = () => {
                                 onRequestSub={initiateSubRequest}
                                 onModifyRotation={initiateRotationCheck}
                                 onSetServe={handleSetServe}
-                                onToggleRotationView={handleToggleRotationView}
-                                showRotationView={liveMatch.showRotation}
+                                onToggleRotationView={() => handleToggleRotationView((liveMatch.showRotation && liveMatch.tvSettings?.showRotationMode === 'teamB') ? 'off' : 'teamB')}
+                                showRotationView={Boolean(liveMatch.showRotation && (liveMatch.tvSettings?.showRotationMode === 'teamB' || liveMatch.tvSettings?.showRotationMode === 'both' || !liveMatch.tvSettings?.showRotationMode))}
                                 teamId={activeTournament.fixtures?.find(f => f.id === liveMatch.matchId)?.teamBId!}
                                 teamName={activeTournament.teams.find(t => t.id === activeTournament.fixtures?.find(f => f.id === liveMatch.matchId)?.teamBId)?.name!}
                                 players={activeTournament.teams.find(t => t.id === activeTournament.fixtures?.find(f => f.id === liveMatch.matchId)?.teamBId)?.players || []}
@@ -2863,7 +2945,9 @@ export const App: React.FC = () => {
               rotationA={liveMatch.rotationA}
               rotationB={liveMatch.rotationB}
               servingTeamId={liveMatch.servingTeamId}
-              onClose={handleToggleRotationView}
+              initialTab={liveMatch.tvSettings?.showRotationMode || 'both'}
+              onTabChange={(tab) => handleToggleRotationView(tab)}
+              onClose={() => handleToggleRotationView('off')}
             />
           );
       })()}

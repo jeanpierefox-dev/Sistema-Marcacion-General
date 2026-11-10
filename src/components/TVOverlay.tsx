@@ -537,6 +537,7 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
               oldSettings?.showVersus !== newSettings?.showVersus ||
               oldSettings?.featuredPlayerMode !== newSettings?.featuredPlayerMode ||
               oldSettings?.showFormations !== newSettings?.showFormations ||
+              oldSettings?.showRotationMode !== newSettings?.showRotationMode ||
               oldSettings?.showSetStatsExt !== newSettings?.showSetStatsExt ||
               oldSettings?.showMatchStatsExt !== newSettings?.showMatchStatsExt ||
               oldSettings?.showTopPlayersExt !== newSettings?.showTopPlayersExt;
@@ -1230,8 +1231,8 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
           </div>
       )}
 
-      {/* --- ROTATION OVERLAY (COURT VISUALIZATION) --- */}
-      {activeShowRotation && (
+      {/* --- ROTATION OVERLAY (DETAILED TACTICAL COURT VISUALIZATION) --- */}
+      {Boolean(activeShowRotation || activeTvSettings?.showFormations || activeTvSettings?.showRotationMode) && (
           <RotationView 
             teamA={teamA} 
             teamB={teamB} 
@@ -1239,7 +1240,22 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
             rotationB={match.rotationB} 
             isVertical={isVertical} 
             servingTeamId={match.servingTeamId}
-            onClose={() => onUpdateMatch?.({ showRotation: false })}
+            initialTab={
+              (typeof activeShowRotation === 'string' && ['both', 'teamA', 'teamB'].includes(activeShowRotation))
+                ? (activeShowRotation as 'both' | 'teamA' | 'teamB')
+                : (activeTvSettings?.showRotationMode || 'both')
+            }
+            onTabChange={(tab) => {
+              onUpdateMatch?.({ 
+                tvSettings: activeTvSettings ? { ...activeTvSettings, showRotationMode: tab } : undefined 
+              });
+            }}
+            onClose={() => {
+              onUpdateMatch?.({ 
+                showRotation: false,
+                tvSettings: activeTvSettings ? { ...activeTvSettings, showFormations: false, showRotationMode: null } : undefined
+              });
+            }}
           />
       )}
 
@@ -1825,74 +1841,7 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
 
 
 
-      {/* --- FORMATIONS OVERLAY --- */}
-      {activeTvSettings?.showFormations && (
-          <div className="fixed inset-0 z-40 flex flex-col pointer-events-none items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in zoom-in duration-500">
-             <div className={`relative flex font-sans ${isVertical ? 'flex-col gap-4' : 'flex-row gap-12'}`}>
-                {/* Team A Formation */}
-                <div className="relative w-[30vh] h-[30vh] md:w-[45vh] md:h-[45vh]">
-                   <div className="absolute -top-12 left-0 right-0 text-center font-black text-white uppercase tracking-widest text-lg md:text-2xl drop-shadow-[0_0_5px_rgba(130,125,255,1)]">{teamA.name}</div>
-                   <div className="w-full h-full bg-[#182a47]/80 border border-blue-500/50 shadow-[0_0_50px_rgba(59,130,246,0.3)] origin-bottom rotate-x-[50deg] rounded-lg grid grid-cols-3 grid-rows-2 p-4 gap-4 relative">
-                       {/* Attack Line */}
-                       <div className="absolute top-1/3 left-0 right-0 h-1 bg-cyan-400/50 shadow-[0_0_10px_#22d3ee]"></div>
-                       {[4,3,2,5,6,1].map((pos, i) => {
-                          const player = match.rotationA[pos-1];
-                          const isServing = match.servingTeamId === teamA.id && pos === 1;
-                          return (
-                             <div key={pos} className="flex items-center justify-center relative -rotate-x-[50deg]">
-                                {player ? (
-                                   <div className={`flex flex-col items-center animate-in zoom-in transition-transform hover:scale-110 ${isServing ? 'animate-[bounce_2s_infinite]' : ''}`} style={{animationDelay: `${i*100}ms`}}>
-                                      {player.profile?.photoUrl ? (
-                                         <img src={player.profile.photoUrl} className="w-12 h-12 md:w-20 md:h-20 rounded-full object-cover border-2 border-[#827DFF] shadow-[0_10px_20px_rgba(0,0,0,0.5)]" />
-                                      ) : (
-                                         <div className="w-12 h-12 md:w-20 md:h-20 rounded-full bg-[#18233f] border-2 border-[#827DFF] flex items-center justify-center text-white font-black text-xl shadow-[0_10px_20px_rgba(0,0,0,0.5)]">{player.number}</div>
-                                      )}
-                                      <span className="text-[10px] md:text-xs text-blue-100 font-bold bg-black/80 px-2 py-0.5 rounded mt-2 truncate max-w-[80px] shadow-lg border border-white/10 uppercase tracking-widest">{player.name.split(' ')[0]}</span>
-                                      {isServing && <span className="absolute -bottom-4 bg-black/80 text-yellow-400 border border-yellow-400 px-2 rounded-full text-[8px] font-black tracking-widest mt-1">SAQUE</span>}
-                                   </div>
-                                ) : <div className="text-white/20 text-[8px] font-bold">POS {pos}</div>}
-                             </div>
-                          );
-                       })}
-                   </div>
-                </div>
-                
-                {/* VS Center */}
-                {!isVertical && (
-                   <div className="w-1 md:w-2 bg-white/20 rounded-full h-[60%] self-center blur-[1px]"></div>
-                )}
 
-                {/* Team B Formation */}
-                <div className="relative w-[30vh] h-[30vh] md:w-[45vh] md:h-[45vh]">
-                   <div className={`absolute ${isVertical?'-top-12':'-top-12'} left-0 right-0 text-center font-black text-white uppercase tracking-widest text-lg md:text-2xl drop-shadow-[0_0_5px_rgba(76,139,255,1)]`}>{teamB.name}</div>
-                   <div className="w-full h-full bg-[#3b1717]/80 border border-red-500/50 shadow-[0_0_50px_rgba(239,68,68,0.3)] origin-bottom rotate-x-[50deg] rounded-lg grid grid-cols-3 grid-rows-2 p-4 gap-4 relative">
-                       {/* Attack Line */}
-                       <div className="absolute bottom-1/3 left-0 right-0 h-1 bg-rose-400/50 shadow-[0_0_10px_#fb7185]"></div>
-                       {/* Note: reversed side for Team B so the net is in the middle logically if placed side by side */}
-                       {[2,3,4,1,6,5].map((pos, i) => {
-                          const player = match.rotationB[pos-1];
-                          const isServing = match.servingTeamId === teamB.id && pos === 1;
-                          return (
-                             <div key={pos} className="flex items-center justify-center relative -rotate-x-[50deg]">
-                                {player ? (
-                                   <div className={`flex flex-col items-center animate-in zoom-in transition-transform hover:scale-110 ${isServing ? 'animate-[bounce_2s_infinite]' : ''}`} style={{animationDelay: `${i*100}ms`}}>
-                                      {player.profile?.photoUrl ? (
-                                         <img src={player.profile.photoUrl} className="w-12 h-12 md:w-20 md:h-20 rounded-full object-cover border-2 border-[#4C8BFF] shadow-[0_10px_20px_rgba(0,0,0,0.5)]" />
-                                      ) : (
-                                         <div className="w-12 h-12 md:w-20 md:h-20 rounded-full bg-[#3b1a1a] border-2 border-[#4C8BFF] flex items-center justify-center text-white font-black text-xl shadow-[0_10px_20px_rgba(0,0,0,0.5)]">{player.number}</div>
-                                      )}
-                                      <span className="text-[10px] md:text-xs text-red-100 font-bold bg-black/80 px-2 py-0.5 rounded mt-2 truncate max-w-[80px] shadow-lg border border-white/10 uppercase tracking-widest">{player.name.split(' ')[0]}</span>
-                                      {isServing && <span className="absolute -bottom-4 bg-black/80 text-yellow-400 border border-yellow-400 px-2 rounded-full text-[8px] font-black tracking-widest mt-1">SAQUE</span>}
-                                   </div>
-                                ) : <div className="text-white/20 text-[8px] font-bold">POS {pos}</div>}
-                             </div>
-                          );
-                       })}
-                   </div>
-                </div>
-             </div>
-          </div>
-      )}
 
       {/* --- POINT EVOLUTION (TIMELINE) OVERLAY --- */}
       {activeTvSettings?.showPointEvolution && (
@@ -2482,7 +2431,28 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
                 });
                 const topPlayer = targetTeam.players.find(p => p.id === topPId);
 
-                return { totalPts, attacks, attackPct, blocks, aces, inCourt, featured, featuredStats, topPlayer, topPts };
+                // Jugador a mostrar: el seleccionado manualmente o el top anotador o el primer jugador
+                const displayPlayer = featured || topPlayer || (onCourtRotation && onCourtRotation[0]) || targetTeam.players[0] || null;
+                const displayStats = displayPlayer 
+                    ? (pScores[displayPlayer.id] || { pts: 0, att: 0, blk: 0, ace: 0 }) 
+                    : { pts: 0, att: 0, blk: 0, ace: 0 };
+                const isManuallySelected = !!featured;
+
+                return { 
+                    totalPts, 
+                    attacks, 
+                    attackPct, 
+                    blocks, 
+                    aces, 
+                    inCourt, 
+                    featured, 
+                    featuredStats, 
+                    topPlayer, 
+                    topPts,
+                    displayPlayer,
+                    displayStats,
+                    isManuallySelected
+                };
             };
 
             const leftTeam = swapSides ? teamB : teamA;
@@ -2609,46 +2579,67 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
                                       </div>
                                   </div>
 
-                                  {/* Jugadores en Cancha / Jugador Seleccionado */}
-                                  <div className="flex flex-col gap-0.5 bg-black/40 rounded-lg p-1 border border-white/5 max-h-[140px] overflow-y-auto">
-                                      <div className="flex justify-between items-center px-1 text-[7px] font-black text-slate-400 uppercase tracking-widest border-b border-white/5 pb-0.5">
-                                          <span>EN JUEGO (SET {match.currentSet})</span>
-                                          <span>PTS</span>
-                                      </div>
-                                      {leftStats.inCourt.map(({ player, stats }) => {
-                                          const isFeat = leftStats.featured?.id === player.id;
-                                          return (
-                                              <div 
-                                                  key={player.id} 
-                                                  className={`flex items-center justify-between px-1 py-0.5 rounded text-[8px] transition-colors ${
-                                                      isFeat ? 'bg-cyan-500/25 border border-cyan-400/40 text-cyan-200 font-black' : 'hover:bg-white/5 text-slate-200'
-                                                  }`}
-                                              >
-                                                  <div className="flex items-center gap-1 min-w-0">
-                                                      <span className="font-mono text-[7px] text-slate-400 font-bold shrink-0">#{player.number}</span>
-                                                      <span className="truncate uppercase font-bold">{player.name.split(' ')[0]}</span>
-                                                      {isFeat && <span className="text-[6px] bg-cyan-400 text-slate-950 px-1 rounded font-black">★</span>}
-                                                  </div>
-                                                  <span className="font-mono font-black shrink-0 text-white">
-                                                      {stats.pts}
-                                                  </span>
-                                              </div>
-                                          );
-                                      })}
-                                  </div>
+                                  {/* Jugador Seleccionado (Solo el jugador y su foto pequeña) */}
+                                   {leftStats.displayPlayer && (
+                                       <div className={`p-2 rounded-xl border flex items-center gap-2.5 ${
+                                           leftTeam.id === teamA.id
+                                               ? "bg-cyan-950/40 border-cyan-400/40 shadow-[0_0_15px_rgba(34,211,238,0.15)]"
+                                               : "bg-rose-950/40 border-rose-400/40 shadow-[0_0_15px_rgba(244,63,94,0.15)]"
+                                       }`}>
+                                           {/* Foto pequeña del jugador */}
+                                           {leftStats.displayPlayer.profile?.photoUrl ? (
+                                               <img 
+                                                   src={leftStats.displayPlayer.profile.photoUrl} 
+                                                   alt={leftStats.displayPlayer.name} 
+                                                   className="w-11 h-11 sm:w-12 sm:h-12 rounded-lg object-cover bg-black/60 border border-white/20 shadow-md shrink-0" 
+                                               />
+                                           ) : (
+                                               <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-lg border flex flex-col items-center justify-center font-mono font-black shrink-0 ${
+                                                   leftTeam.id === teamA.id 
+                                                       ? "bg-cyan-500/20 border-cyan-400/30 text-cyan-300" 
+                                                       : "bg-rose-500/20 border-rose-400/30 text-rose-300"
+                                               }`}>
+                                                   <span className="text-[8px] text-slate-400 font-bold">#</span>
+                                                   <span className="text-sm font-black leading-none">{leftStats.displayPlayer.number}</span>
+                                               </div>
+                                           )}
 
-                                  {/* Destacado / Top Anotador */}
-                                  {leftStats.featured ? (
-                                      <div className="bg-cyan-500/20 border border-cyan-400/30 px-1.5 py-0.5 rounded-lg text-[8px] flex items-center justify-between text-cyan-300">
-                                          <span className="font-black uppercase truncate">★ #{leftStats.featured.number} {leftStats.featured.name}</span>
-                                          <span className="font-mono font-bold shrink-0">{leftStats.featuredStats?.pts || 0} pts</span>
-                                      </div>
-                                  ) : leftStats.topPlayer && (
-                                      <div className="bg-white/5 px-1.5 py-0.5 rounded-lg text-[8px] flex items-center justify-between text-slate-300 border border-white/5">
-                                          <span className="text-slate-400 uppercase font-bold truncate">Top: #{leftStats.topPlayer.number} {leftStats.topPlayer.name}</span>
-                                          <span className="font-mono font-black text-amber-300 shrink-0">{leftStats.topPts} pts</span>
-                                      </div>
-                                  )}
+                                           {/* Información del jugador */}
+                                           <div className="flex-1 min-w-0">
+                                               <div className="flex items-center gap-1 mb-0.5">
+                                                   <span className={`text-[7px] font-black uppercase px-1 py-0.5 rounded leading-none ${
+                                                       leftStats.isManuallySelected
+                                                           ? (leftTeam.id === teamA.id ? "bg-cyan-400 text-slate-950 font-black" : "bg-rose-500 text-white font-black")
+                                                           : "bg-white/10 text-slate-300"
+                                                   }`}>
+                                                       {leftStats.isManuallySelected ? "★ SELECCIONADO" : "TOP ANOTADOR"}
+                                                   </span>
+                                                   <span className="text-[7px] font-mono text-slate-400 font-bold">#{leftStats.displayPlayer.number}</span>
+                                               </div>
+                                               <div className="text-white font-black text-[11px] sm:text-xs uppercase tracking-wide truncate">
+                                                   {leftStats.displayPlayer.name}
+                                               </div>
+                                               <div className="text-[8px] text-slate-400 uppercase font-bold truncate">
+                                                   {leftStats.displayPlayer.role || "JUGADOR"}
+                                               </div>
+                                           </div>
+
+                                           {/* Puntos y desglose */}
+                                           <div className="text-right shrink-0 pl-1 border-l border-white/10">
+                                               <span className="text-[7px] text-slate-400 uppercase font-mono block leading-none">PTS</span>
+                                               <span className={`text-sm sm:text-base font-mono font-black block leading-tight ${
+                                                   leftTeam.id === teamA.id ? "text-cyan-300" : "text-rose-400"
+                                               }`}>
+                                                   {leftStats.displayStats.pts}
+                                               </span>
+                                               <div className="text-[6.5px] text-slate-400 font-mono flex items-center justify-end gap-1 mt-0.5">
+                                                   <span title="Ataques">A:{leftStats.displayStats.att}</span>
+                                                   <span title="Bloqueos">B:{leftStats.displayStats.blk}</span>
+                                                   <span title="Aces">S:{leftStats.displayStats.ace}</span>
+                                               </div>
+                                           </div>
+                                       </div>
+                                   )}
                               </div>
                           </div>
                       )}
@@ -2712,46 +2703,67 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
                                       </div>
                                   </div>
 
-                                  {/* Jugadores en Cancha / Jugador Seleccionado */}
-                                  <div className="flex flex-col gap-0.5 bg-black/40 rounded-lg p-1 border border-white/5 max-h-[140px] overflow-y-auto">
-                                      <div className="flex justify-between items-center px-1 text-[7px] font-black text-slate-400 uppercase tracking-widest border-b border-white/5 pb-0.5">
-                                          <span>EN JUEGO (SET {match.currentSet})</span>
-                                          <span>PTS</span>
-                                      </div>
-                                      {rightStats.inCourt.map(({ player, stats }) => {
-                                          const isFeat = rightStats.featured?.id === player.id;
-                                          return (
-                                              <div 
-                                                  key={player.id} 
-                                                  className={`flex items-center justify-between px-1 py-0.5 rounded text-[8px] transition-colors ${
-                                                      isFeat ? 'bg-rose-500/25 border border-rose-400/40 text-rose-200 font-black' : 'hover:bg-white/5 text-slate-200'
-                                                  }`}
-                                              >
-                                                  <div className="flex items-center gap-1 min-w-0">
-                                                      <span className="font-mono text-[7px] text-slate-400 font-bold shrink-0">#{player.number}</span>
-                                                      <span className="truncate uppercase font-bold">{player.name.split(' ')[0]}</span>
-                                                      {isFeat && <span className="text-[6px] bg-rose-500 text-white px-1 rounded font-black">★</span>}
-                                                  </div>
-                                                  <span className="font-mono font-black shrink-0 text-white">
-                                                      {stats.pts}
-                                                  </span>
-                                              </div>
-                                          );
-                                      })}
-                                  </div>
+                                  {/* Jugador Seleccionado (Solo el jugador y su foto pequeña) */}
+                                   {rightStats.displayPlayer && (
+                                       <div className={`p-2 rounded-xl border flex items-center gap-2.5 ${
+                                           rightTeam.id === teamB.id
+                                               ? "bg-rose-950/40 border-rose-400/40 shadow-[0_0_15px_rgba(244,63,94,0.15)]"
+                                               : "bg-cyan-950/40 border-cyan-400/40 shadow-[0_0_15px_rgba(34,211,238,0.15)]"
+                                       }`}>
+                                           {/* Foto pequeña del jugador */}
+                                           {rightStats.displayPlayer.profile?.photoUrl ? (
+                                               <img 
+                                                   src={rightStats.displayPlayer.profile.photoUrl} 
+                                                   alt={rightStats.displayPlayer.name} 
+                                                   className="w-11 h-11 sm:w-12 sm:h-12 rounded-lg object-cover bg-black/60 border border-white/20 shadow-md shrink-0" 
+                                               />
+                                           ) : (
+                                               <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-lg border flex flex-col items-center justify-center font-mono font-black shrink-0 ${
+                                                   rightTeam.id === teamB.id 
+                                                       ? "bg-rose-500/20 border-rose-400/30 text-rose-300" 
+                                                       : "bg-cyan-500/20 border-cyan-400/30 text-cyan-300"
+                                               }`}>
+                                                   <span className="text-[8px] text-slate-400 font-bold">#</span>
+                                                   <span className="text-sm font-black leading-none">{rightStats.displayPlayer.number}</span>
+                                               </div>
+                                           )}
 
-                                  {/* Destacado / Top Anotador */}
-                                  {rightStats.featured ? (
-                                      <div className="bg-rose-500/20 border border-rose-400/30 px-1.5 py-0.5 rounded-lg text-[8px] flex items-center justify-between text-rose-300">
-                                          <span className="font-black uppercase truncate">★ #{rightStats.featured.number} {rightStats.featured.name}</span>
-                                          <span className="font-mono font-bold shrink-0">{rightStats.featuredStats?.pts || 0} pts</span>
-                                      </div>
-                                  ) : rightStats.topPlayer && (
-                                      <div className="bg-white/5 px-1.5 py-0.5 rounded-lg text-[8px] flex items-center justify-between text-slate-300 border border-white/5">
-                                          <span className="text-slate-400 uppercase font-bold truncate">Top: #{rightStats.topPlayer.number} {rightStats.topPlayer.name}</span>
-                                          <span className="font-mono font-black text-amber-300 shrink-0">{rightStats.topPts} pts</span>
-                                      </div>
-                                  )}
+                                           {/* Información del jugador */}
+                                           <div className="flex-1 min-w-0">
+                                               <div className="flex items-center gap-1 mb-0.5">
+                                                   <span className={`text-[7px] font-black uppercase px-1 py-0.5 rounded leading-none ${
+                                                       rightStats.isManuallySelected
+                                                           ? (rightTeam.id === teamB.id ? "bg-rose-500 text-white font-black" : "bg-cyan-400 text-slate-950 font-black")
+                                                           : "bg-white/10 text-slate-300"
+                                                   }`}>
+                                                       {rightStats.isManuallySelected ? "★ SELECCIONADO" : "TOP ANOTADOR"}
+                                                   </span>
+                                                   <span className="text-[7px] font-mono text-slate-400 font-bold">#{rightStats.displayPlayer.number}</span>
+                                               </div>
+                                               <div className="text-white font-black text-[11px] sm:text-xs uppercase tracking-wide truncate">
+                                                   {rightStats.displayPlayer.name}
+                                               </div>
+                                               <div className="text-[8px] text-slate-400 uppercase font-bold truncate">
+                                                   {rightStats.displayPlayer.role || "JUGADOR"}
+                                               </div>
+                                           </div>
+
+                                           {/* Puntos y desglose */}
+                                           <div className="text-right shrink-0 pl-1 border-l border-white/10">
+                                               <span className="text-[7px] text-slate-400 uppercase font-mono block leading-none">PTS</span>
+                                               <span className={`text-sm sm:text-base font-mono font-black block leading-tight ${
+                                                   rightTeam.id === teamB.id ? "text-rose-400" : "text-cyan-300"
+                                               }`}>
+                                                   {rightStats.displayStats.pts}
+                                               </span>
+                                               <div className="text-[6.5px] text-slate-400 font-mono flex items-center justify-end gap-1 mt-0.5">
+                                                   <span title="Ataques">A:{rightStats.displayStats.att}</span>
+                                                   <span title="Bloqueos">B:{rightStats.displayStats.blk}</span>
+                                                   <span title="Aces">S:{rightStats.displayStats.ace}</span>
+                                               </div>
+                                           </div>
+                                       </div>
+                                   )}
                               </div>
                           </div>
                       )}

@@ -8,6 +8,8 @@ interface RotationViewProps {
   rotationB: (Player | null)[];
   isVertical?: boolean;
   servingTeamId?: string;
+  initialTab?: 'both' | 'teamA' | 'teamB';
+  onTabChange?: (tab: 'both' | 'teamA' | 'teamB') => void;
   onClose?: () => void;
 }
 
@@ -18,10 +20,23 @@ export const RotationView: React.FC<RotationViewProps> = ({
   rotationB, 
   isVertical = false,
   servingTeamId,
+  initialTab = 'both',
+  onTabChange,
   onClose 
 }) => {
   // Modo de visualización: ambos separados lado a lado, solo Equipo A, o solo Equipo B
-  const [activeTab, setActiveTab] = useState<'both' | 'teamA' | 'teamB'>('both');
+  const [activeTab, setActiveTab] = useState<'both' | 'teamA' | 'teamB'>(initialTab);
+
+  React.useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
+
+  const handleTabSelect = (tab: 'both' | 'teamA' | 'teamB') => {
+    setActiveTab(tab);
+    onTabChange?.(tab);
+  };
 
   const getPlayer = (rot: (Player | null)[] | undefined, pos: number): Player | null => {
     if (!rot || !Array.isArray(rot)) return null;
@@ -239,30 +254,6 @@ export const RotationView: React.FC<RotationViewProps> = ({
             </div>
           </div>
         </div>
-
-        {/* Resumen del sexteto titular (Lista inferior para verificación rápida del árbitro/mesa) */}
-        <div className="bg-black/40 border border-white/5 rounded-xl p-2.5">
-          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
-            Sexteto en Cancha (Posiciones 1 a 6)
-          </span>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-xs">
-            {[1, 2, 3, 4, 5, 6].map(pos => {
-              const p = getPlayer(rotation, pos);
-              return (
-                <div key={pos} className="flex items-center gap-1.5 bg-slate-900/60 px-2 py-1 rounded border border-white/5">
-                  <span className="text-[9px] font-mono font-bold text-slate-400">P{pos}:</span>
-                  {p ? (
-                    <span className="font-bold text-white truncate text-[11px]">
-                      #{p.number} {p.name.split(' ')[0]}
-                    </span>
-                  ) : (
-                    <span className="text-slate-500 text-[10px] italic">-</span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
       </div>
     );
   };
@@ -290,7 +281,7 @@ export const RotationView: React.FC<RotationViewProps> = ({
           {/* Selector de modo: Ambos Equipos o individual */}
           <div className="flex items-center gap-1.5 bg-slate-900 p-1 rounded-xl border border-white/10">
             <button
-              onClick={() => setActiveTab('both')}
+              onClick={() => handleTabSelect('both')}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                 activeTab === 'both'
                   ? 'bg-cyan-500 text-slate-950 shadow-md font-black'
@@ -300,7 +291,7 @@ export const RotationView: React.FC<RotationViewProps> = ({
               👥 Ambos Equipos
             </button>
             <button
-              onClick={() => setActiveTab('teamA')}
+              onClick={() => handleTabSelect('teamA')}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                 activeTab === 'teamA'
                   ? 'bg-cyan-600 text-white shadow-md font-black'
@@ -310,7 +301,7 @@ export const RotationView: React.FC<RotationViewProps> = ({
               🔵 EQ. A: {teamA.name.split(' ')[0]}
             </button>
             <button
-              onClick={() => setActiveTab('teamB')}
+              onClick={() => handleTabSelect('teamB')}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                 activeTab === 'teamB'
                   ? 'bg-rose-600 text-white shadow-md font-black'
