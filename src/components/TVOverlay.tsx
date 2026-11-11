@@ -99,11 +99,11 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
 
           if (teamAPoint && !wasTeamAPoint) {
              const isMatchPoint = calcWinsA === requiredWins - 1;
-             setPointBanner({ text: isMatchPoint ? 'MATCH POINT' : 'SET POINT', color: '#827DFF' });
+             setPointBanner({ text: isMatchPoint ? 'PUNTO DE PARTIDO' : 'PUNTO DE SET', color: '#827DFF' });
              setTimeout(() => setPointBanner(null), 3000);
           } else if (teamBPoint && !wasTeamBPoint) {
              const isMatchPoint = calcWinsB === requiredWins - 1;
-             setPointBanner({ text: isMatchPoint ? 'MATCH POINT' : 'SET POINT', color: '#4C8BFF' });
+             setPointBanner({ text: isMatchPoint ? 'PUNTO DE PARTIDO' : 'PUNTO DE SET', color: '#4C8BFF' });
              setTimeout(() => setPointBanner(null), 3000);
           }
       };
@@ -171,7 +171,7 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
     });
     list.push({
       id: 'sim_halcon',
-      label: 'CÁMARA LÍNEA - HAWK-EYE (SIM)',
+      label: 'CÁMARA LÍNEA - OJO DE HALCÓN (SIM)',
       type: 'simulated'
     });
 
@@ -319,12 +319,12 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
 
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 9px monospace';
-      ctx.fillText('CAM-4 HAWK-EYE LÍNEA (240 FPS)', 20, 25);
+      ctx.fillText('CAM-4 OJO DE HALCÓN LÍNEA (240 FPS)', 20, 25);
       
       if (showRipple) {
         ctx.fillStyle = isBallIn ? '#22c55e' : '#ef4444';
         ctx.font = 'bold 12px sans-serif';
-        ctx.fillText(isBallIn ? 'IN (DENTRO)' : 'OUT (FUERA)', width - 100, 28);
+        ctx.fillText(isBallIn ? 'BALÓN DENTRO' : 'BALÓN FUERA', width - 110, 28);
       }
     }
   };
@@ -896,7 +896,7 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
                       DESAFÍO VAR EN VIVO
                     </span>
                     <span className="text-cyan-400 font-mono text-xs font-bold uppercase tracking-wider">
-                      VNL CHALLENGE SYSTEM
+                      SISTEMA OFICIAL DE DESAFÍO VAR
                     </span>
                   </div>
                   <h1 className="text-2xl md:text-4xl font-black text-white uppercase italic tracking-wider mt-1 drop-shadow-md">
@@ -959,7 +959,7 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
                         ? 'bg-green-600/30 border-green-400 text-green-300 shadow-[0_0_30px_rgba(34,197,94,0.4)]' 
                         : 'bg-red-600/30 border-red-400 text-red-300 shadow-[0_0_30px_rgba(239,68,68,0.4)]'
                     }`}>
-                      {ch.simulatedIn !== false ? '🟢 IN: BALÓN DENTRO (+12 mm)' : '🔴 OUT: BALÓN FUERA (-18 mm)'}
+                      {ch.simulatedIn !== false ? '🟢 BALÓN DENTRO (+12 mm)' : '🔴 BALÓN FUERA (-18 mm)'}
                     </div>
                   </div>
                 </div>
@@ -983,7 +983,7 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
                     REPETICIÓN EN CÁMARA LENTA {Math.round((ch.slowMoSpeed || 0.25) * 100)}%
                   </h3>
                   <p className="text-slate-400 text-xs md:text-sm max-w-md mt-1 font-mono">
-                    ÁNGULO: {ch.cameraAngle === 'attack' ? 'RED Y BLOQUEO' : ch.cameraAngle === 'serve' ? 'LÍNEA DE SAQUE' : 'PLANO GENERAL'}
+                    ÁNGULO: {ch.cameraAngle === 'attack' ? 'RED Y BLOQUEO' : ch.cameraAngle === 'serve' ? 'LÍNEA DE SAQUE' : ch.cameraAngle === 'timeout' ? 'TIEMPO TÉCNICO Y BANCA' : 'PLANO GENERAL'}
                   </p>
                 </div>
               )}
@@ -1000,8 +1000,8 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
                     DECISIÓN ARBITRAL
                   </span>
                   <h3 className="text-lg md:text-2xl font-black text-white uppercase tracking-wide">
-                    {ch.verdict === 'BALL_IN' ? 'BALÓN DENTRO (IN) - PUNTO ASIGNADO' :
-                     ch.verdict === 'BALL_OUT' ? 'BALÓN FUERA (OUT) - PUNTO ASIGNADO' :
+                    {ch.verdict === 'BALL_IN' ? 'BALÓN DENTRO - PUNTO ASIGNADO' :
+                     ch.verdict === 'BALL_OUT' ? 'BALÓN FUERA - PUNTO ASIGNADO' :
                      ch.verdict === 'CONFIRMED' ? 'DECISIÓN ORIGINAL CONFIRMADA' :
                      ch.verdict === 'TOUCH_NET' ? 'INFRACCIÓN: TOQUE DE RED' :
                      ch.verdict === 'TOUCH_BLOCK' ? 'INFRACCIÓN: TOQUE DE BLOQUEO' :
@@ -1283,7 +1283,7 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
 
                 {/* Central Loading Text */}
                 <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-white font-mono text-xs tracking-[0.5em] animate-pulse bg-black/50 px-4 py-1 border border-white/30">LOADING STATS...</span>
+                    <span className="text-white font-mono text-xs tracking-[0.5em] animate-pulse bg-black/50 px-4 py-1 border border-white/30">CARGANDO ESTADÍSTICAS...</span>
                 </div>
              </div>
         </div>
@@ -1304,7 +1304,7 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
                          ) : (
                              <div className="text-white font-black text-center leading-none">
                                  <div className="text-4xl italic">VNL</div>
-                                 <div className="text-[9px] tracking-widest uppercase mt-1">Volleyball<br/>Nations League</div>
+                                 <div className="text-[9px] tracking-widest uppercase mt-1">Torneo Oficial<br/>Voleibol</div>
                              </div>
                          )}
                     </div>
@@ -1330,7 +1330,7 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
                         {(() => {
                             const isGeneral = match.statsSetIndex === undefined;
                             const activeSetLabel = isGeneral ? 'PARTIDO' : `SET ${match.statsSetIndex! + 1}`;
-                            const titleLabel = isGeneral ? 'MATCH STATS' : 'SET STATS';
+                            const titleLabel = isGeneral ? 'ESTADÍSTICAS DEL PARTIDO' : 'ESTADÍSTICAS DEL SET';
                             return (
                                 <>
                                 {/* Set Label */}
@@ -1392,10 +1392,10 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
                         <div className="flex flex-col">
                             {[
                                 { l: sets.filter(s => s.scoreA > s.scoreB).length, label: 'SETS', r: sets.filter(s => s.scoreB > s.scoreA).length },
-                                { l: statsA.attacks, label: 'ATTACKS', r: statsB.attacks },
-                                { l: statsA.blocks, label: 'BLOCKS', r: statsB.blocks },
-                                { l: statsA.aces, label: 'SERVES', r: statsB.aces },
-                                { l: statsA.errors, label: 'OPPONENT ERRORS', r: statsB.errors }
+                                { l: statsA.attacks, label: 'ATAQUES', r: statsB.attacks },
+                                { l: statsA.blocks, label: 'BLOQUEOS', r: statsB.blocks },
+                                { l: statsA.aces, label: 'SAQUES ACES', r: statsB.aces },
+                                { l: statsA.errors, label: 'ERRORES DEL RIVAL', r: statsB.errors }
                             ].map((row, idx) => (
                                 <div key={idx} className={`flex h-12 items-center border-b border-white/10 ${idx % 2 === 0 ? 'bg-[#dc2626]' : 'bg-[#1e3a8a]'}`}>
                                     {/* Team A Value */}
@@ -1574,82 +1574,151 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
           const effA = stA.attTot > 0 ? Math.round((stA.att/stA.attTot)*100) : 0;
           const effB = stB.attTot > 0 ? Math.round((stB.att/stB.attTot)*100) : 0;
 
+          const formatRoleSpanish = (role?: string) => {
+              if (!role) return '-';
+              const r = role.toLowerCase();
+              if (r.includes('armad') || r.includes('sett')) return 'ARMADOR';
+              if (r.includes('opuest') || r.includes('oppo')) return 'OPUESTO';
+              if (r.includes('centr') || r.includes('midd')) return 'CENTRAL';
+              if (r.includes('liber')) return 'LÍBERO';
+              if (r.includes('punt') || r.includes('outs') || r.includes('recep')) return 'PUNTA';
+              return role.toUpperCase();
+          };
+
           const rows = [
-              { label: 'ROLE', l: pA.role, r: pB.role },
-              { label: 'AGE', l: pA.profile?.birthDate ? (new Date().getFullYear() - new Date(pA.profile.birthDate).getFullYear()) : '-', r: pB.profile?.birthDate ? (new Date().getFullYear() - new Date(pB.profile.birthDate).getFullYear()) : '-' },
-              { label: 'HEIGHT', l: pA.profile?.height ? pA.profile.height+' cm' : '-', r: pB.profile?.height ? pB.profile.height+' cm' : '-' },
-              { label: 'TOTAL POINTS', l: stA.pts, r: stB.pts },
-              { label: 'EFFICIENCY', l: effA+'%', r: effB+'%' },
-              { label: 'ATTACKS IN', l: stA.att, r: stB.att },
-              { label: 'BLOCKS', l: stA.blk, r: stB.blk },
-              { label: 'SERVES', l: stA.srv, r: stB.srv },
+              { label: 'POSICIÓN', l: formatRoleSpanish(pA.role), r: formatRoleSpanish(pB.role) },
+              { label: 'EDAD', l: pA.profile?.birthDate ? (new Date().getFullYear() - new Date(pA.profile.birthDate).getFullYear()) : '-', r: pB.profile?.birthDate ? (new Date().getFullYear() - new Date(pB.profile.birthDate).getFullYear()) : '-' },
+              { label: 'ESTATURA', l: pA.profile?.height ? pA.profile.height+' cm' : '-', r: pB.profile?.height ? pB.profile.height+' cm' : '-' },
+              { label: 'PUNTOS TOTALES', l: stA.pts, r: stB.pts },
+              { label: 'EFECTIVIDAD', l: effA+'%', r: effB+'%' },
+              { label: 'ATAQUES', l: stA.att, r: stB.att },
+              { label: 'BLOQUEOS', l: stA.blk, r: stB.blk },
+              { label: 'SAQUES ACES', l: stA.srv, r: stB.srv },
           ];
 
           return (
-          <div className="fixed inset-0 z-50 flex flex-col pointer-events-none items-center justify-center p-4 bg-transparent animate-in slide-in-from-bottom duration-500">
-             <div className="relative flex flex-col items-center w-full max-w-5xl">
-                 <div className="flex flex-col items-center mb-6 drop-shadow-xl">
-                     <h2 className="text-7xl font-black text-white italic tracking-tighter uppercase relative">
-                        <span className="absolute -left-[5rem] -top-8 text-[#827DFF] text-xl opacity-50 tracking-tighter">VOLLEYTV</span>
-                        TOP PLAYERS
+          <div className="fixed inset-0 z-50 flex flex-col pointer-events-none items-center justify-center p-2 md:p-6 bg-black/40 backdrop-blur-[2px] animate-in slide-in-from-bottom duration-500">
+             <div className="relative flex flex-col items-center w-full max-w-6xl xl:max-w-7xl">
+                 {/* ENCABEZADO SUPERIOR */}
+                 <div className="flex flex-col items-center mb-3 md:mb-5 drop-shadow-2xl">
+                     <span className="text-cyan-400 font-mono text-xs md:text-sm font-bold tracking-[0.3em] uppercase bg-black/60 px-4 py-0.5 rounded-full border border-cyan-500/30 mb-1">
+                        VOLEIBOL TV
+                     </span>
+                     <h2 className="text-3xl md:text-5xl font-black text-white italic tracking-wider uppercase drop-shadow-[0_4px_12px_rgba(0,0,0,0.9)] text-center">
+                        CUADRO COMPARATIVO
                      </h2>
-                     <span className="text-white font-bold tracking-[0.3em] text-sm mt-1">SET {match.currentSet}</span>
+                     <div className="flex items-center gap-2 mt-1">
+                        <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+                        <span className="text-white/90 font-bold tracking-[0.25em] text-[10px] md:text-xs uppercase bg-black/60 px-3 py-0.5 rounded-full border border-white/10">
+                           SET {match.currentSet}
+                        </span>
+                     </div>
                  </div>
-                 <div className="flex w-full items-end justify-center h-[50vh]">
-                     {/* LEFT PLAYER */}
-                     <div className="w-[30%] h-[120%] relative flex justify-center">
+
+                 {/* CONTENIDO PRINCIPAL: JUGADOR IZQUIERDO (EXTREMO) | CUADRO COMPARATIVO (CENTRO DESPEJADO) | JUGADOR DERECHO (EXTREMO) */}
+                 <div className="flex w-full items-end justify-between h-[52vh] relative px-2">
+                     
+                     {/* JUGADOR IZQUIERDO (AVANZADO AL EXTREMO IZQUIERDO) */}
+                     <div className="w-[25%] md:w-[27%] h-[115%] relative flex flex-col items-center justify-end z-10 shrink-0">
                          {pA.profile?.photoUrl ? (
-                            <img src={pA.profile.photoUrl} className="absolute bottom-0 h-full object-contain mb-8 z-20 drop-shadow-2xl translate-x-12"/>
+                            <img 
+                               src={pA.profile.photoUrl} 
+                               alt={pA.name}
+                               className="absolute bottom-0 h-full object-contain mb-10 z-10 drop-shadow-[0_15px_30px_rgba(0,0,0,0.9)] transition-all"
+                            />
                          ) : (
-                            <div className="absolute bottom-16 w-48 h-48 bg-white border-2 border-white/20 rounded shadow overflow-hidden flex items-center justify-center z-20 translate-x-8">
-                                {teamA.logoUrl ? <img src={teamA.logoUrl} className="w-full h-full object-cover"/> : <div className="text-black font-black text-6xl">{teamA.name.substring(0,3).toUpperCase()}</div>}
+                            <div className="absolute bottom-16 w-36 h-36 md:w-48 md:h-48 bg-gradient-to-br from-blue-950 to-slate-900 border-2 border-cyan-400/30 rounded-2xl shadow-2xl overflow-hidden flex items-center justify-center z-10">
+                                {teamA.logoUrl ? (
+                                   <img src={teamA.logoUrl} className="w-full h-full object-cover p-2" alt={teamA.name} />
+                                ) : (
+                                   <div className="text-cyan-400 font-black text-5xl">{teamA.name.substring(0,3).toUpperCase()}</div>
+                                )}
                             </div>
                          )}
-                         <div className="absolute bottom-0 text-white font-black italic text-4xl bg-[#4C8BFF] px-6 py-2 rounded-t z-30 shadow-2xl flex items-center gap-2 pr-12 translate-x-4">
-                            <span>{pA.role} {pA.number}</span>
-                            <div className="text-3xl ml-2 drop-shadow-md">{pA.name.split(' ')[0]}</div>
+                         {/* Placa con Nombre y Rol en el extremo izquierdo */}
+                         <div className="w-full max-w-[260px] text-white font-black italic bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-900 px-3 py-2 rounded-t-2xl z-30 shadow-[0_-5px_25px_rgba(0,0,0,0.8)] flex flex-col items-center justify-center border-t-2 border-x border-cyan-400">
+                            <span className="text-[10px] md:text-xs font-mono font-bold tracking-wider bg-black/40 px-2 py-0.5 rounded-full text-cyan-300 uppercase mb-0.5">
+                               {formatRoleSpanish(pA.role)} #{pA.number}
+                            </span>
+                            <div className="text-base md:text-xl drop-shadow-md truncate max-w-full uppercase text-center">
+                               {pA.name}
+                            </div>
                          </div>
                      </div>
-                     {/* STATS BOARD */}
-                     <div className="w-[50%] bg-gradient-to-br from-[#1b143c] to-[#0e0c1f] rounded-t-xl overflow-hidden shadow-[0_-10px_40px_rgba(0,0,0,0.8)] border border-white/10 z-10 relative flex flex-col">
-                         <div className="flex justify-between items-center py-2 px-8 bg-black/40">
-                             <div className="w-12 h-6 border bg-white flex items-center justify-center overflow-hidden">
-                                 {teamA.logoUrl ? <img src={teamA.logoUrl} className="object-cover h-full w-full"/> : teamA.name.substring(0,3)}
+
+                     {/* TABLA CENTRAL: CUADRO COMPARATIVO (100% VISIBLE Y DESPEJADO) */}
+                     <div className="w-[48%] md:w-[44%] max-w-xl mx-auto bg-gradient-to-br from-[#120e2e]/98 via-[#0c0a1a]/98 to-[#06050e]/98 rounded-2xl overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.95)] border-2 border-white/20 z-20 relative flex flex-col mb-1">
+                         {/* Encabezado con Logos y Nombres de Equipo */}
+                         <div className="flex justify-between items-center py-2.5 px-4 md:px-6 bg-gradient-to-r from-blue-950/80 via-black/80 to-rose-950/80 border-b border-white/10">
+                             <div className="flex items-center gap-2 min-w-0">
+                                 <div className="w-9 h-7 md:w-11 md:h-8 rounded bg-white/10 p-0.5 border border-white/20 flex items-center justify-center overflow-hidden shrink-0">
+                                     {teamA.logoUrl ? <img src={teamA.logoUrl} className="object-contain h-full w-full" alt="" /> : <span className="font-black text-xs text-cyan-400">{teamA.name.substring(0,3)}</span>}
+                                 </div>
+                                 <span className="text-white font-black text-xs md:text-sm uppercase italic truncate max-w-[90px] md:max-w-[130px]">
+                                     {teamA.name}
+                                 </span>
                              </div>
-                             <div className="w-12 h-6 border bg-white flex items-center justify-center overflow-hidden">
-                                 {teamB.logoUrl ? <img src={teamB.logoUrl} className="object-cover h-full w-full"/> : teamB.name.substring(0,3)}
+
+                             <div className="text-[10px] md:text-xs font-mono font-bold text-amber-400 px-2 py-0.5 rounded bg-black/50 border border-amber-400/30 uppercase tracking-widest shrink-0">
+                                 VS
+                             </div>
+
+                             <div className="flex items-center gap-2 min-w-0 flex-row-reverse">
+                                 <div className="w-9 h-7 md:w-11 md:h-8 rounded bg-white/10 p-0.5 border border-white/20 flex items-center justify-center overflow-hidden shrink-0">
+                                     {teamB.logoUrl ? <img src={teamB.logoUrl} className="object-contain h-full w-full" alt="" /> : <span className="font-black text-xs text-rose-400">{teamB.name.substring(0,3)}</span>}
+                                 </div>
+                                 <span className="text-white font-black text-xs md:text-sm uppercase italic truncate max-w-[90px] md:max-w-[130px]">
+                                     {teamB.name}
+                                 </span>
                              </div>
                          </div>
-                         <div className="flex flex-col py-4 gap-1">
+
+                         {/* Filas de Estadísticas Comparativas */}
+                         <div className="flex flex-col p-2 md:p-3 gap-1">
                              {rows.map((r, i) => (
-                                 <div key={i} className="flex font-black text-lg h-9">
-                                     <div className="flex-1 bg-gradient-to-r from-[#170a4a] to-[#251bc2] flex items-center justify-start px-6 text-white drop-shadow-md">
+                                 <div key={i} className="flex font-black text-sm md:text-base h-8 md:h-9 rounded-lg overflow-hidden border border-white/5">
+                                     <div className="flex-1 bg-gradient-to-r from-blue-900/60 to-blue-700/80 flex items-center justify-start px-3 md:px-5 text-white drop-shadow-md">
                                          {r.l}
                                      </div>
-                                     <div className="w-1/3 bg-[#3f3178]/20 flex items-center justify-center text-[#c2bdf0] tracking-widest text-sm font-bold">
+                                     <div className="w-[36%] md:w-[32%] bg-black/60 flex items-center justify-center text-[#c2bdf0] tracking-wider text-[10px] md:text-xs font-bold uppercase text-center px-1">
                                          {r.label}
                                      </div>
-                                     <div className="flex-1 bg-gradient-to-l from-[#4a0a1a] to-[#c21b44] flex items-center justify-end px-6 text-white drop-shadow-md">
+                                     <div className="flex-1 bg-gradient-to-l from-rose-900/60 to-rose-700/80 flex items-center justify-end px-3 md:px-5 text-white drop-shadow-md">
                                          {r.r}
                                      </div>
                                  </div>
                              ))}
                          </div>
                      </div>
-                     {/* RIGHT PLAYER */}
-                     <div className="w-[30%] h-[120%] relative flex justify-center">
+
+                     {/* JUGADOR DERECHO (AVANZADO AL EXTREMO DERECHO) */}
+                     <div className="w-[25%] md:w-[27%] h-[115%] relative flex flex-col items-center justify-end z-10 shrink-0">
                          {pB.profile?.photoUrl ? (
-                            <img src={pB.profile.photoUrl} className="absolute bottom-0 h-full object-contain mb-8 z-20 drop-shadow-2xl -translate-x-12 scale-x-[-1]"/>
+                            <img 
+                               src={pB.profile.photoUrl} 
+                               alt={pB.name}
+                               className="absolute bottom-0 h-full object-contain mb-10 z-10 drop-shadow-[0_15px_30px_rgba(0,0,0,0.9)] scale-x-[-1] transition-all"
+                            />
                          ) : (
-                            <div className="absolute bottom-16 w-48 h-48 bg-white border-2 border-white/20 rounded shadow overflow-hidden flex items-center justify-center z-20 -translate-x-8">
-                                {teamB.logoUrl ? <img src={teamB.logoUrl} className="w-full h-full object-cover"/> : <div className="text-black font-black text-6xl">{teamB.name.substring(0,3).toUpperCase()}</div>}
+                            <div className="absolute bottom-16 w-36 h-36 md:w-48 md:h-48 bg-gradient-to-br from-rose-950 to-slate-900 border-2 border-rose-400/30 rounded-2xl shadow-2xl overflow-hidden flex items-center justify-center z-10">
+                                {teamB.logoUrl ? (
+                                   <img src={teamB.logoUrl} className="w-full h-full object-cover p-2" alt={teamB.name} />
+                                ) : (
+                                   <div className="text-rose-400 font-black text-5xl">{teamB.name.substring(0,3).toUpperCase()}</div>
+                                )}
                             </div>
                          )}
-                         <div className="absolute bottom-0 text-[#251bc2] font-black italic text-4xl bg-white px-6 py-2 rounded-t z-30 shadow-2xl flex items-center gap-2 pl-12 -translate-x-4">
-                            <div className="text-3xl mr-2 drop-shadow-md">{pB.name.split(' ')[0]}</div>
-                            <span>{pB.role} {pB.number}</span>
+                         {/* Placa con Nombre y Rol en el extremo derecho */}
+                         <div className="w-full max-w-[260px] text-white font-black italic bg-gradient-to-l from-rose-700 via-pink-700 to-rose-900 px-3 py-2 rounded-t-2xl z-30 shadow-[0_-5px_25px_rgba(0,0,0,0.8)] flex flex-col items-center justify-center border-t-2 border-x border-rose-400">
+                            <span className="text-[10px] md:text-xs font-mono font-bold tracking-wider bg-black/40 px-2 py-0.5 rounded-full text-rose-300 uppercase mb-0.5">
+                               {formatRoleSpanish(pB.role)} #{pB.number}
+                            </span>
+                            <div className="text-base md:text-xl drop-shadow-md truncate max-w-full uppercase text-center">
+                               {pB.name}
+                            </div>
                          </div>
                      </div>
+
                  </div>
              </div>
           </div>
@@ -1662,17 +1731,17 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
               <div className="flex flex-col items-center justify-center gap-2 relative z-10 w-[300px] h-[340px] border-2 border-slate-500/50 bg-[#0f111a]/95 shadow-[0_0_30px_rgba(0,0,0,0.9)] rounded-xl overflow-hidden pointer-events-auto">
                   <div className="absolute top-0 w-full h-1 bg-blue-500"></div>
                   
-                  <h2 className="text-xl font-black text-white italic tracking-[0.2em] mt-4 mb-2">CHALLENGE</h2>
+                  <h2 className="text-xl font-black text-white italic tracking-[0.2em] mt-4 mb-2">DESAFÍO VAR</h2>
                   
                   <div className="relative w-[280px] h-[180px] overflow-hidden bg-[#2582b5] rounded border border-white/10 shadow-inner">
                         {/* The Line */}
                         <div className="absolute top-[35%] w-full h-full bg-[#d96a32] border-t-[12px] border-white flex flex-col items-center shadow-[inset_0_10px_20px_rgba(0,0,0,0.2)]"></div>
                         
                         <div className="absolute bottom-[65%] w-full flex justify-center pb-2">
-                             <span className="text-white/40 font-black uppercase tracking-[0.3em] text-2xl">OUT</span>
+                             <span className="text-white/40 font-black uppercase tracking-[0.3em] text-2xl">FUERA</span>
                         </div>
                         <div className="absolute top-[40%] w-full flex justify-center pt-2">
-                             <span className="text-white/40 font-black uppercase tracking-[0.3em] text-2xl">IN</span>
+                             <span className="text-white/40 font-black uppercase tracking-[0.3em] text-2xl">DENTRO</span>
                         </div>
 
                         {/* The Ball Animation */}
@@ -1732,13 +1801,13 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
 
                   {activeTvSettings.hawkEyeStatus === 'in' ? (
                       <div className="animate-in fade-in zoom-in delay-1000 duration-500 fill-mode-both flex flex-col items-center pb-2 mt-2">
-                          <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-b from-green-300 to-green-600 drop-shadow-[0_0_20px_rgba(34,197,94,0.8)] leading-none">IN</h1>
-                          <p className="text-green-400 font-bold text-xs tracking-[0.3em] mt-1">DENTRO</p>
+                          <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-b from-green-300 to-green-600 drop-shadow-[0_0_20px_rgba(34,197,94,0.8)] leading-none">DENTRO</h1>
+                          <p className="text-green-400 font-bold text-xs tracking-[0.3em] mt-1">BALÓN DENTRO</p>
                       </div>
                   ) : (
                       <div className="animate-in fade-in zoom-in delay-1000 duration-500 fill-mode-both flex flex-col items-center pb-2 mt-2">
-                          <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-b from-red-400 to-red-600 drop-shadow-[0_0_20px_rgba(220,38,38,0.8)] leading-none">OUT</h1>
-                          <p className="text-red-400 font-bold text-xs tracking-[0.3em] mt-1">FUERA</p>
+                          <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-b from-red-400 to-red-600 drop-shadow-[0_0_20px_rgba(220,38,38,0.8)] leading-none">FUERA</h1>
+                          <p className="text-red-400 font-bold text-xs tracking-[0.3em] mt-1">BALÓN FUERA</p>
                       </div>
                   )}
               </div>
@@ -1784,7 +1853,7 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
                          <div className="w-1/2 p-8 flex flex-col justify-center">
                              <div className="mb-6">
                                  <h2 className="text-6xl font-black text-white uppercase italic tracking-tighter leading-none">{player.name}</h2>
-                                 <p className="text-xl font-bold text-vnl-accent uppercase tracking-widest mt-2">{player.role} | {pTeam.name}</p>
+                                 <p className="text-xl font-bold text-vnl-accent uppercase tracking-widest mt-2">{(() => { const r = (player.role || "").toLowerCase(); if (r.includes("armad") || r.includes("sett")) return "ARMADOR"; if (r.includes("opuest") || r.includes("oppo")) return "OPUESTO"; if (r.includes("centr") || r.includes("midd")) return "CENTRAL"; if (r.includes("liber")) return "LÍBERO"; if (r.includes("punt") || r.includes("outs") || r.includes("recep")) return "PUNTA"; return (player.role || "-").toUpperCase(); })()} | {pTeam.name}</p>
                              </div>
                              
                              {isPresentation ? (
@@ -1833,118 +1902,344 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
 
 
 
-      {/* --- POINT EVOLUTION (TIMELINE) OVERLAY --- */}
+      {/* --- POINT EVOLUTION (TIMELINE & TECHNICAL TIMEOUT SCREEN) --- */}
       {activeTvSettings?.showPointEvolution && (
-          <div className="absolute bottom-4 md:bottom-8 left-1/2 -translate-x-1/2 w-full max-w-5xl z-40 flex flex-col pointer-events-none items-center justify-center p-4 bg-transparent animate-in slide-in-from-bottom duration-500">
-             <div className="relative w-full flex items-center justify-center drop-shadow-[0_0_30px_rgba(0,0,0,0.8)]">
-                  {(() => {
-                      const currSet = match.sets[match.currentSet - 1] || { history: [] };
-                      const setHistory = currSet.history || [];
+          <div className="z-40 pointer-events-none">
+              {(() => {
+                  const evoMode = activeTvSettings?.pointEvolutionMode || 'general';
+                  const isTeamTimeout = evoMode === 'teamA' || evoMode === 'teamB';
+                  const currSet = match.sets[match.currentSet - 1] || { history: [] };
+                  const setHistory = currSet.history || [];
+
+                  // Si es Opción 2: Evolución de puntos en una sola pantalla para Tiempo Técnico (Equipo Izquierdo o Derecho)
+                  if (isTeamTimeout) {
+                      const isTeamA = evoMode === 'teamA';
+                      const fTeam = isTeamA ? teamA : teamB;
+                      const fScore = isTeamA ? match.scoreA : match.scoreB;
+                      const oppScore = isTeamA ? match.scoreB : match.scoreA;
+                      const fTeamActs = setHistory.filter(h => h.teamId === fTeam.id);
                       
-                      const timeline: { a: number, b: number, whoScored: string }[] = [];
-                      
-                      const scoringEvents = setHistory.filter(h => 
-                          h.type === 'attack' || h.type === 'block' || h.type === 'ace' || h.type === 'opponent_error' || h.type === 'red_card'
-                      );
+                      const kills = fTeamActs.filter(h => h.type === 'attack').length;
+                      const blocks = fTeamActs.filter(h => h.type === 'block').length;
+                      const aces = fTeamActs.filter(h => h.type === 'ace').length;
+                      const oppErrors = setHistory.filter(h => h.teamId !== fTeam.id && h.type === 'opponent_error').length;
 
-                      scoringEvents.forEach((h, index) => {
-                          const [scoreAStr, scoreBStr] = h.scoreSnapshot.split('-');
-                          const newA = parseInt(scoreAStr);
-                          const newB = parseInt(scoreBStr);
+                      // Calcular racha reciente de este equipo
+                      let streak = 0;
+                      for (let i = setHistory.length - 1; i >= 0; i--) {
+                          const h = setHistory[i];
+                          const whoScored = (h.type === 'opponent_error' || h.type === 'red_card')
+                              ? (h.teamId === teamA.id ? teamB.id : teamA.id)
+                              : h.teamId;
+                          if (whoScored === fTeam.id) streak++;
+                          else break;
+                      }
 
-                          let whoScored = '';
-                          const prevA = index > 0 ? timeline[index-1].a : 0;
-                          const prevB = index > 0 ? timeline[index-1].b : 0;
-                          
-                          if (newA > prevA && newB === prevB) {
-                              whoScored = teamA.id;
-                          } else if (newB > prevB && newA === prevA) {
-                              whoScored = teamB.id;
-                          } else {
-                              if (h.type === 'opponent_error' || h.type === 'red_card') {
-                                  whoScored = h.teamId === teamA.id ? teamB.id : teamA.id;
-                              } else {
-                                  whoScored = h.teamId;
-                              }
-                          }
-                          timeline.push({ a: newA, b: newB, whoScored });
-                      });
-
-                      const maxColumns = 12; 
-                      const reversedDisplay = [...timeline].reverse();
-                      const historyDisplay = reversedDisplay.slice(0, maxColumns);
+                      // Últimos puntos anotados por este equipo
+                      const scoringPills = setHistory
+                          .filter(h => {
+                              const who = (h.type === 'opponent_error' || h.type === 'red_card')
+                                  ? (h.teamId === teamA.id ? teamB.id : teamA.id)
+                                  : h.teamId;
+                              return who === fTeam.id;
+                          })
+                          .slice(-8)
+                          .reverse();
 
                       return (
-                          <div className="flex flex-col rounded overflow-hidden shadow-2xl relative w-full border-2 border-white/10">
-                              <div className="flex h-12 md:h-16 text-white bg-gradient-to-r from-[#82193b] to-[#400e23] border-b border-white/20">
-                                  <div className="w-48 flex items-center justify-between px-4 shrink-0">
-                                      <div className="w-10 h-6 bg-white flex items-center justify-center overflow-hidden">
-                                          {teamA.logoUrl ? <img src={teamA.logoUrl} className="object-cover w-full h-full" /> : <div className="text-black font-black text-[10px]">{teamA.name.substring(0,3)}</div>}
+                          <div className={`fixed bottom-6 ${isTeamA ? 'left-6' : 'right-6'} w-[360px] md:w-[420px] animate-in slide-in-from-bottom duration-500`}>
+                              <div className={`p-4 rounded-2xl border-2 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.9)] flex flex-col gap-3 ${
+                                  isTeamA 
+                                      ? 'bg-gradient-to-br from-[#0c1c38]/95 via-[#081326]/95 to-[#040814]/95 border-cyan-400/80 shadow-[0_0_25px_rgba(34,211,238,0.35)]'
+                                      : 'bg-gradient-to-br from-[#280c20]/95 via-[#1a0816]/95 to-[#080206]/95 border-rose-400/80 shadow-[0_0_25px_rgba(244,63,94,0.35)]'
+                              }`}>
+                                  {/* Encabezado de Tiempo Técnico */}
+                                  <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
+                                      <div className="flex items-center gap-2.5">
+                                          <div className={`w-3 h-3 rounded-full animate-ping ${isTeamA ? 'bg-cyan-400' : 'bg-rose-400'}`}></div>
+                                          <div>
+                                              <span className={`text-[9px] font-black tracking-widest uppercase px-2 py-0.5 rounded border ${
+                                                  isTeamA ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400/30' : 'bg-rose-500/20 text-rose-300 border-rose-400/30'
+                                              }`}>
+                                                  ⏱️ TIEMPO TÉCNICO • EVOLUCIÓN
+                                              </span>
+                                              <h3 className="text-white font-black text-sm md:text-base uppercase tracking-wider truncate mt-0.5">
+                                                  {fTeam.name}
+                                              </h3>
+                                          </div>
                                       </div>
-                                      <span className="font-black text-3xl italic tracking-tighter drop-shadow-md">{teamA.name.substring(0,3).toUpperCase()}</span>
-                                  </div>
-                                  <div className="w-16 md:w-20 bg-[#1c38fa] flex items-center justify-center text-3xl md:text-5xl font-black tabular-nums border-x border-white/20 shrink-0 shadow-2xl z-20">
-                                      {match.scoreA}
-                                  </div>
-                                  {historyDisplay.map((pointState, i) => (
-                                      <div key={i} className={`flex-1 flex items-center justify-center border-r border-[#ffffff15] text-xl md:text-3xl font-black ${pointState.whoScored === teamA.id ? 'text-white bg-[#ffffff10]' : 'text-white/50'}`}>
-                                          {pointState.a}
+                                      <div className="text-right">
+                                          <span className="text-[10px] text-slate-400 font-mono block">MARCADOR SET {match.currentSet}</span>
+                                          <span className={`text-2xl font-mono font-black ${isTeamA ? 'text-cyan-300' : 'text-rose-300'}`}>
+                                              {fScore} <span className="text-xs text-white/50">- {oppScore}</span>
+                                          </span>
                                       </div>
-                                  ))}
-                                  {/* Fill empty columns if needed */}
-                                  {Array.from({length: Math.max(0, maxColumns - historyDisplay.length)}).map((_, i) => (
-                                      <div key={'e'+i} className="flex-1 flex items-center justify-center border-r border-[#ffffff15]"></div>
-                                  ))}
-                              </div>
+                                  </div>
 
-                              <div className="flex h-12 md:h-16 text-white bg-gradient-to-r from-[#100742] to-[#0a0521]">
-                                  <div className="w-48 flex items-center justify-between px-4 shrink-0">
-                                      <div className="w-10 h-6 bg-white flex items-center justify-center overflow-hidden">
-                                          {teamB.logoUrl ? <img src={teamB.logoUrl} className="object-cover w-full h-full" /> : <div className="text-black font-black text-[10px]">{teamB.name.substring(0,3)}</div>}
+                                  {/* Cámara para el Tiempo Técnico (Banca y Charla Estratégica) */}
+                                  <div className="relative w-full h-32 md:h-36 rounded-xl overflow-hidden border border-white/15 bg-black/60 shadow-inner flex items-center justify-center">
+                                      <div className="absolute top-2 left-2 z-10 flex items-center gap-1.5 bg-black/70 px-2 py-0.5 rounded text-[8px] font-mono font-bold text-yellow-400 border border-yellow-400/30 uppercase">
+                                          <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
+                                          CÁMARA BANCA {fTeam.name.substring(0,3).toUpperCase()}
                                       </div>
-                                      <span className="font-black text-3xl italic tracking-tighter drop-shadow-md">{teamB.name.substring(0,3).toUpperCase()}</span>
-                                  </div>
-                                  <div className="w-16 md:w-20 bg-[#1c38fa] flex items-center justify-center text-3xl md:text-5xl font-black tabular-nums border-x border-white/20 shrink-0 shadow-2xl z-20">
-                                      {match.scoreB}
-                                  </div>
-                                  {historyDisplay.map((pointState, i) => (
-                                      <div key={i} className={`flex-1 flex items-center justify-center border-r border-[#ffffff15] text-xl md:text-3xl font-black ${pointState.whoScored === teamB.id ? 'text-white bg-[#ffffff10]' : 'text-white/50'}`}>
-                                          {pointState.b}
+                                      <div className="absolute top-2 right-2 z-10 bg-black/70 px-2 py-0.5 rounded text-[8px] font-mono font-bold text-white/80 border border-white/10 uppercase">
+                                          CHARLA TÁCTICA
                                       </div>
-                                  ))}
-                                  {Array.from({length: Math.max(0, maxColumns - historyDisplay.length)}).map((_, i) => (
-                                      <div key={'e'+i} className="flex-1 flex items-center justify-center border-r border-[#ffffff15]"></div>
-                                  ))}
+                                      {/* Canvas simulado o video de tiempo técnico */}
+                                      <div className="w-full h-full flex flex-col items-center justify-center p-3 text-center bg-gradient-to-b from-slate-900 via-blue-950/60 to-slate-950">
+                                          <div className="text-2xl mb-1">⏱️</div>
+                                          <span className="text-xs font-black text-white uppercase tracking-wider">
+                                              Instrucciones del Director Técnico
+                                          </span>
+                                          <span className="text-[9px] text-slate-400 font-mono mt-0.5">
+                                              {fTeam.coachName ? `DT: ${fTeam.coachName}` : 'Pizarra de Estrategia'}
+                                          </span>
+                                      </div>
+                                  </div>
+
+                                  {/* Desglose de Puntos del Equipo */}
+                                  <div className="grid grid-cols-4 gap-1.5 text-center">
+                                      <div className="bg-white/5 p-1.5 rounded-lg border border-white/5">
+                                          <span className="text-xs font-mono font-black text-white block">{kills}</span>
+                                          <span className="text-[8px] text-slate-400 uppercase font-bold tracking-wider">Ataques</span>
+                                      </div>
+                                      <div className="bg-white/5 p-1.5 rounded-lg border border-white/5">
+                                          <span className="text-xs font-mono font-black text-white block">{blocks}</span>
+                                          <span className="text-[8px] text-slate-400 uppercase font-bold tracking-wider">Bloqueos</span>
+                                      </div>
+                                      <div className="bg-white/5 p-1.5 rounded-lg border border-white/5">
+                                          <span className="text-xs font-mono font-black text-white block">{aces}</span>
+                                          <span className="text-[8px] text-slate-400 uppercase font-bold tracking-wider">Aces</span>
+                                      </div>
+                                      <div className="bg-white/5 p-1.5 rounded-lg border border-white/5">
+                                          <span className="text-xs font-mono font-black text-white block">{oppErrors}</span>
+                                          <span className="text-[8px] text-slate-400 uppercase font-bold tracking-wider">Errores</span>
+                                      </div>
+                                  </div>
+
+                                  {/* Racha y Últimos Puntos */}
+                                  <div className="flex items-center justify-between bg-black/40 px-3 py-1.5 rounded-xl border border-white/5 text-[9px]">
+                                      <div className="flex items-center gap-1 text-amber-300 font-bold uppercase">
+                                          <span>🔥</span> Racha: {streak > 0 ? `+${streak} pts seguidos` : 'En disputa'}
+                                      </div>
+                                      <div className="flex items-center gap-1 font-mono text-[8px] text-slate-400">
+                                          {scoringPills.slice(0, 4).map((p, idx) => (
+                                              <span key={idx} className="bg-white/10 px-1.5 py-0.5 rounded text-white font-bold">
+                                                  {p.type === 'attack' ? 'ATK' : p.type === 'block' ? 'BLK' : p.type === 'ace' ? 'ACE' : 'ERR'}
+                                              </span>
+                                          ))}
+                                      </div>
+                                  </div>
                               </div>
                           </div>
                       );
-                  })()}
-             </div>
+                  }
+
+                  // Opción 1: Evolución General durante el partido o set (Ambos Equipos)
+                  const timeline: { a: number, b: number, whoScored: string }[] = [];
+                  const scoringEvents = setHistory.filter(h => 
+                      h.type === 'attack' || h.type === 'block' || h.type === 'ace' || h.type === 'opponent_error' || h.type === 'red_card'
+                  );
+
+                  scoringEvents.forEach((h, index) => {
+                      const [scoreAStr, scoreBStr] = h.scoreSnapshot.split('-');
+                      const newA = parseInt(scoreAStr);
+                      const newB = parseInt(scoreBStr);
+
+                      let whoScored = '';
+                      const prevA = index > 0 ? timeline[index-1].a : 0;
+                      const prevB = index > 0 ? timeline[index-1].b : 0;
+                      
+                      if (newA > prevA && newB === prevB) {
+                          whoScored = teamA.id;
+                      } else if (newB > prevB && newA === prevA) {
+                          whoScored = teamB.id;
+                      } else {
+                          if (h.type === 'opponent_error' || h.type === 'red_card') {
+                              whoScored = h.teamId === teamA.id ? teamB.id : teamA.id;
+                          } else {
+                              whoScored = h.teamId;
+                          }
+                      }
+                      timeline.push({ a: newA, b: newB, whoScored });
+                  });
+
+                  const maxColumns = 14; 
+                  const reversedDisplay = [...timeline].reverse();
+                  const historyDisplay = reversedDisplay.slice(0, maxColumns);
+
+                  return (
+                      <div className="fixed bottom-4 md:bottom-8 left-1/2 -translate-x-1/2 w-full max-w-5xl flex flex-col pointer-events-none items-center justify-center p-4 bg-transparent animate-in slide-in-from-bottom duration-500">
+                         <div className="relative w-full flex flex-col items-center drop-shadow-[0_0_30px_rgba(0,0,0,0.8)]">
+                              <div className="bg-gradient-to-r from-slate-950/95 via-[#0c162c]/95 to-slate-950/95 px-5 py-1 rounded-t-xl border-t border-x border-white/20 text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] text-cyan-300 flex items-center gap-2">
+                                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+                                  EVOLUCIÓN GENERAL DE PUNTOS • SET {match.currentSet}
+                              </div>
+                              <div className="flex flex-col rounded-b-xl overflow-hidden shadow-2xl relative w-full border-2 border-white/10">
+                                  <div className="flex h-12 md:h-14 text-white bg-gradient-to-r from-[#82193b] to-[#400e23] border-b border-white/20">
+                                      <div className="w-48 flex items-center justify-between px-4 shrink-0">
+                                          <div className="w-10 h-6 bg-white flex items-center justify-center overflow-hidden rounded">
+                                              {teamA.logoUrl ? <img src={teamA.logoUrl} className="object-cover w-full h-full" alt="" /> : <div className="text-black font-black text-[10px]">{teamA.name.substring(0,3)}</div>}
+                                          </div>
+                                          <span className="font-black text-2xl md:text-3xl italic tracking-tighter drop-shadow-md truncate max-w-[110px]">{teamA.name}</span>
+                                      </div>
+                                      <div className="w-16 md:w-20 bg-[#1c38fa] flex items-center justify-center text-2xl md:text-4xl font-black tabular-nums border-x border-white/20 shrink-0 shadow-2xl z-20">
+                                          {match.scoreA}
+                                      </div>
+                                      {historyDisplay.map((pointState, i) => (
+                                          <div key={i} className={`flex-1 flex items-center justify-center border-r border-[#ffffff15] text-lg md:text-2xl font-black ${pointState.whoScored === teamA.id ? 'text-white bg-[#ffffff15]' : 'text-white/40'}`}>
+                                              {pointState.a}
+                                          </div>
+                                      ))}
+                                      {Array.from({length: Math.max(0, maxColumns - historyDisplay.length)}).map((_, i) => (
+                                          <div key={'e'+i} className="flex-1 flex items-center justify-center border-r border-[#ffffff15]"></div>
+                                      ))}
+                                  </div>
+
+                                  <div className="flex h-12 md:h-14 text-white bg-gradient-to-r from-[#100742] to-[#0a0521]">
+                                      <div className="w-48 flex items-center justify-between px-4 shrink-0">
+                                          <div className="w-10 h-6 bg-white flex items-center justify-center overflow-hidden rounded">
+                                              {teamB.logoUrl ? <img src={teamB.logoUrl} className="object-cover w-full h-full" alt="" /> : <div className="text-black font-black text-[10px]">{teamB.name.substring(0,3)}</div>}
+                                          </div>
+                                          <span className="font-black text-2xl md:text-3xl italic tracking-tighter drop-shadow-md truncate max-w-[110px]">{teamB.name}</span>
+                                      </div>
+                                      <div className="w-16 md:w-20 bg-[#1c38fa] flex items-center justify-center text-2xl md:text-4xl font-black tabular-nums border-x border-white/20 shrink-0 shadow-2xl z-20">
+                                          {match.scoreB}
+                                      </div>
+                                      {historyDisplay.map((pointState, i) => (
+                                          <div key={i} className={`flex-1 flex items-center justify-center border-r border-[#ffffff15] text-lg md:text-2xl font-black ${pointState.whoScored === teamB.id ? 'text-white bg-[#ffffff15]' : 'text-white/40'}`}>
+                                              {pointState.b}
+                                          </div>
+                                      ))}
+                                      {Array.from({length: Math.max(0, maxColumns - historyDisplay.length)}).map((_, i) => (
+                                          <div key={'e'+i} className="flex-1 flex items-center justify-center border-r border-[#ffffff15]"></div>
+                                      ))}
+                                  </div>
+                              </div>
+                         </div>
+                      </div>
+                  );
+              })()}
           </div>
       )}
-      {/* SERVE SPEED OVERLAY */}
+
+      {/* --- RADAR DE SAQUE (SEGÚN JUGADOR EN ROTACIÓN ZONA 1 Y CÁLCULO DE TRAYECTORIA DEL BALÓN) --- */}
       {activeTvSettings?.showServeSpeed && (
-          <div className="fixed bottom-32 right-12 z-40 animate-in slide-in-from-right fade-in pointer-events-none">
-              <div className="bg-gradient-to-br from-black/80 to-slate-900 border border-emerald-500/30 rounded-xl shadow-[0_0_30px_rgba(16,185,129,0.3)] p-4 w-64 backdrop-blur-md">
-                  <div className="flex justify-between items-center mb-4">
-                      <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Saque</span>
-                      <span className="text-[10px] font-bold text-white/50">{teamA.players[0]?.name.split(' ')[0] || 'Jugador'}</span>
-                  </div>
-                  <div className="flex items-end gap-2 mb-2">
-                      <span className="text-5xl font-black text-white italic drop-shadow-md tracking-tighter">
-                          104
-                      </span>
-                      <span className="text-emerald-400 font-bold mb-1">km/h</span>
-                  </div>
-                  {/* Dial / Bar Graph */}
-                  <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden mt-3 relative">
-                      <div className="absolute top-0 left-0 h-full w-[85%] bg-gradient-to-r from-emerald-500 to-yellow-400"></div>
-                  </div>
-                  <div className="flex justify-between mt-1 text-[8px] font-bold text-slate-500">
-                      <span>0</span>
-                      <span>MAX 120+</span>
-                  </div>
-              </div>
+          <div className="fixed bottom-28 right-8 z-40 animate-in slide-in-from-right fade-in pointer-events-none">
+              {(() => {
+                  const isServingTeamA = match.servingTeamId === teamA.id;
+                  const sTeam = isServingTeamA ? teamA : teamB;
+                  const sRot = isServingTeamA ? match.rotationA : match.rotationB;
+                  // En rotación de voleibol, la posición 1 (Zona 1 de saque) es el sacador en turno:
+                  const serverPlayer = (sRot && sRot[0]) || sTeam.players[0];
+
+                  const rawNum = serverPlayer?.number;
+                  const numVal = typeof rawNum === 'number' ? rawNum : (parseInt(String(rawNum || '7'), 10) || 7);
+                  const seed = (numVal * 11 + match.scoreA * 3 + match.scoreB * 7);
+                  const isJumpServe = (serverPlayer?.role || '').toLowerCase().includes('punt') || (serverPlayer?.role || '').toLowerCase().includes('opuest');
+
+                  const roleInSpanish = (() => {
+                      const r = (serverPlayer?.role || '').toUpperCase();
+                      if (r.includes('SET') || r.includes('ARM')) return 'Armador';
+                      if (r.includes('OUT') || r.includes('PUNT')) return 'Punta Receptor';
+                      if (r.includes('MID') || r.includes('CENT')) return 'Central';
+                      if (r.includes('OPP') || r.includes('OPU')) return 'Opuesto';
+                      if (r.includes('LIB')) return 'Líbero';
+                      return serverPlayer?.role || 'Jugador';
+                  })();
+
+                  // Cálculo físico de trayectoria del balón:
+                  // Distancia: desde detrás de la línea de saque (0m), sobre la red (a 9m, altura 2.43m) hacia la zona de recepción rival (~15.2m a 16.6m)
+                  const flightDistance = 15.2 + (seed % 14) * 0.1;
+                  const flightTime = isJumpServe ? (0.45 + (seed % 5) * 0.01) : (0.58 + (seed % 7) * 0.01);
+                  const calculatedSpeed = ((flightDistance / flightTime) * 3.6).toFixed(1);
+
+                  return (
+                      <div className="bg-gradient-to-br from-[#071322]/98 via-[#040a14]/98 to-slate-950/98 border-2 border-emerald-400/80 rounded-2xl shadow-[0_0_40px_rgba(16,185,129,0.35)] p-4 w-72 md:w-80 backdrop-blur-xl flex flex-col gap-2.5">
+                          {/* Encabezado: Radar & Equipo */}
+                          <div className="flex justify-between items-center border-b border-white/10 pb-2">
+                              <div className="flex items-center gap-1.5">
+                                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+                                  <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest font-mono">
+                                      RADAR DE SAQUE • ZONA 1
+                                  </span>
+                              </div>
+                              <span className="text-[9px] font-bold text-slate-400 uppercase font-mono">
+                                  {sTeam.name.substring(0,4)}
+                              </span>
+                          </div>
+
+                          {/* Jugador en Rotación (Sacador Oficial) */}
+                          <div className="flex items-center gap-3 bg-black/50 p-2 rounded-xl border border-white/10">
+                              <div className="w-12 h-12 rounded-full overflow-hidden bg-slate-800 border-2 border-emerald-400 shrink-0 flex items-center justify-center font-black text-white text-lg shadow-md">
+                                  {serverPlayer?.profile?.photoUrl ? (
+                                      <img src={serverPlayer.profile.photoUrl} alt={serverPlayer.name} className="w-full h-full object-cover" />
+                                  ) : (
+                                      <span>#{serverPlayer?.number || '1'}</span>
+                                  )}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-1">
+                                      <span className="text-[8px] font-mono font-bold bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded border border-emerald-500/30 uppercase">
+                                          ZONA 1
+                                      </span>
+                                      <span className="text-[8px] text-slate-400 font-bold uppercase truncate">
+                                          {roleInSpanish}
+                                      </span>
+                                  </div>
+                                  <h4 className="text-sm font-black text-white uppercase truncate tracking-wide mt-0.5">
+                                      {serverPlayer?.name || 'Sacador'}
+                                  </h4>
+                              </div>
+                          </div>
+
+                          {/* Velocidad Medida */}
+                          <div className="flex items-baseline justify-between px-1">
+                              <div className="flex items-baseline gap-1.5">
+                                  <span className="text-4xl md:text-5xl font-black text-white italic drop-shadow-[0_0_15px_rgba(52,211,153,0.5)] tracking-tighter">
+                                      {calculatedSpeed}
+                                  </span>
+                                  <span className="text-emerald-400 font-black text-base italic">km/h</span>
+                              </div>
+                              <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider bg-white/5 px-2 py-1 rounded">
+                                  {isJumpServe ? '🚀 Potencia Salto' : '🎯 Flotante Táctico'}
+                              </span>
+                          </div>
+
+                          {/* Gráfico 3D de Trayectoria del Balón sobre la Red */}
+                          <div className="relative w-full h-14 bg-black/60 rounded-xl overflow-hidden border border-white/10 p-1 flex items-end">
+                              <svg className="w-full h-full" viewBox="0 0 100 40" preserveAspectRatio="none">
+                                  {/* Línea de suelo */}
+                                  <line x1="0" y1="38" x2="100" y2="38" stroke="rgba(255,255,255,0.2)" strokeWidth="1" />
+                                  {/* Red central (a x=50, altura 2.43m proporcional) */}
+                                  <line x1="50" y1="38" x2="50" y2="14" stroke="#ffffff" strokeWidth="2" strokeDasharray="2 1" />
+                                  <rect x="48" y="14" width="4" height="2" fill="#ef4444" />
+                                  
+                                  {/* Trayectoria parabólica del balón */}
+                                  <path 
+                                      d="M 5,26 Q 50,4 95,36" 
+                                      fill="none" 
+                                      stroke="#34d399" 
+                                      strokeWidth="2" 
+                                      strokeDasharray="3 1"
+                                  />
+                                  {/* Balón animado sobre la trayectoria */}
+                                  <circle cx="50" cy="10" r="3" fill="#facc15" stroke="#ffffff" strokeWidth="1" className="animate-pulse" />
+                              </svg>
+                              <span className="absolute bottom-1 left-2 text-[7px] font-mono text-slate-400">0m (Saque)</span>
+                              <span className="absolute top-1 left-1/2 -translate-x-1/2 text-[7px] font-mono text-emerald-400">Red: 2.43m</span>
+                              <span className="absolute bottom-1 right-2 text-[7px] font-mono text-slate-400">{flightDistance.toFixed(1)}m</span>
+                          </div>
+
+                          {/* Telemetría física de la trayectoria */}
+                          <div className="grid grid-cols-3 gap-1 text-[8px] font-mono text-slate-300 text-center bg-black/40 p-1.5 rounded-lg border border-white/5">
+                              <div>Dist: <span className="text-white font-bold">{flightDistance.toFixed(1)}m</span></div>
+                              <div>Tiempo: <span className="text-white font-bold">{flightTime.toFixed(2)}s</span></div>
+                              <div>Red: <span className="text-white font-bold">2.43m</span></div>
+                          </div>
+                      </div>
+                  );
+              })()}
           </div>
       )}
 
@@ -2132,7 +2427,13 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
 
       {/* WIN PREDICTION */}
       {activeTvSettings?.showWinPrediction && (
-          <div className="absolute bottom-8 right-8 z-40 flex flex-col pointer-events-none items-center justify-center bg-transparent animate-in slide-in-from-right duration-500 w-[340px]">
+          <div className={`absolute bottom-8 z-40 flex flex-col pointer-events-none items-center justify-center bg-transparent animate-in duration-500 ${
+              activeTvSettings?.winPredictionTeam === 'teamA' 
+                  ? 'left-8 slide-in-from-left w-[360px]' 
+                  : activeTvSettings?.winPredictionTeam === 'teamB'
+                  ? 'right-8 slide-in-from-right w-[360px]'
+                  : 'right-8 slide-in-from-right w-[360px]'
+          }`}>
               {(() => {
                   const currSet = match.sets[match.currentSet - 1] || { history: [], scoreA: match.scoreA, scoreB: match.scoreB };
                   const setHistory = currSet.history || [];
@@ -2149,6 +2450,8 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
                       history: setHistory
                   });
 
+                  const winTeamMode = activeTvSettings?.winPredictionTeam || 'both';
+
                   // Build SVG trajectory line from actual point evolution in the set
                   const hist = setProb.historyProbabilities;
                   const ptsCount = hist.length;
@@ -2160,6 +2463,207 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
                         }).join(' ')
                       : `0,${100 - setProb.probA} 100,${100 - setProb.probA}`;
 
+                  const polyB = ptsCount >= 2 
+                      ? hist.map((p: { probA: number }, i: number) => {
+                          const x = Math.round((i / (ptsCount - 1)) * 100);
+                          const y = Math.round(p.probA); // 100% probB at bottom (y=0 in inverted)
+                          return `${x},${y}`;
+                        }).join(' ')
+                      : `0,${setProb.probA} 100,${setProb.probA}`;
+
+                  // RENDER SINGLE TEAM VIEW: TEAM A
+                  if (winTeamMode === 'teamA') {
+                      const isServing = match.servingTeamId === teamA.id;
+                      const progressPct = Math.min(100, Math.round((match.scoreA / setProb.targetScore) * 100));
+                      return (
+                          <div className="relative w-full bg-[#0a0f1d]/95 border-l-4 border-cyan-400 rounded-xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.9)] backdrop-blur-xl border border-white/10">
+                              <div className="flex flex-col relative w-full pt-3 pb-3 px-4">
+                                  {/* Top Header */}
+                                  <div className="flex justify-between items-center mb-2.5 pb-2 border-b border-white/10">
+                                      <div className="flex items-center gap-2">
+                                          <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_10px_#22d3ee]"></div>
+                                          <span className="text-[11px] font-black tracking-widest text-white uppercase">PREDICCIÓN SET {match.currentSet}</span>
+                                      </div>
+                                      <span className="text-[9px] font-black text-cyan-400 bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-500/30 uppercase tracking-widest">
+                                          {teamA.name}
+                                      </span>
+                                  </div>
+
+                                  {/* Main probability display for Team A */}
+                                  <div className="flex items-center justify-between bg-black/60 rounded-lg p-3 border border-white/5 mb-2.5">
+                                      <div className="flex items-center gap-3">
+                                          <div className="w-12 h-12 rounded-lg bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center overflow-hidden">
+                                              {teamA.logoUrl ? (
+                                                  <img src={teamA.logoUrl} alt={teamA.name} className="w-full h-full object-contain p-1" />
+                                              ) : (
+                                                  <span className="text-xl font-black text-cyan-400">{teamA.name.substring(0, 2).toUpperCase()}</span>
+                                              )}
+                                          </div>
+                                          <div className="flex flex-col">
+                                              <span className="text-xs font-black text-white uppercase tracking-wider">{teamA.name}</span>
+                                              <span className="text-[10px] text-cyan-300 font-bold mt-0.5 flex items-center gap-1">
+                                                  {isServing ? '🏐 Al Saque' : '🛡️ En Recepción'}
+                                                  {setProb.status === 'set_point_A' && (
+                                                      <span className="text-amber-400 font-black animate-pulse ml-1">★ PUNTO DE SET</span>
+                                                  )}
+                                              </span>
+                                          </div>
+                                      </div>
+                                      <div className="flex flex-col items-end">
+                                          <span className="text-3xl font-mono font-black text-cyan-300 leading-none drop-shadow-[0_0_12px_rgba(34,211,238,0.5)]">
+                                              {setProb.probA}%
+                                          </span>
+                                          <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider mt-1">PROBABILIDAD</span>
+                                      </div>
+                                  </div>
+
+                                  {/* Progress bar towards target score */}
+                                  <div className="space-y-1 mb-2.5 bg-black/40 p-2.5 rounded-lg border border-white/5">
+                                      <div className="flex justify-between text-[10px] font-bold">
+                                          <span className="text-slate-300">Marcador Actual: <b className="text-white font-mono">{match.scoreA}</b></span>
+                                          <span className="text-slate-400">Meta: <b className="text-cyan-400 font-mono">{setProb.targetScore} pts</b></span>
+                                      </div>
+                                      <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden relative">
+                                          <div className="h-full bg-gradient-to-r from-cyan-600 to-cyan-400 rounded-full transition-all duration-500 shadow-[0_0_8px_#22d3ee]" style={{ width: `${progressPct}%` }}></div>
+                                      </div>
+                                      <div className="flex justify-between items-center text-[9px] pt-1 text-slate-400 font-medium">
+                                          <span>Faltan <b className="text-cyan-300 font-black">{setProb.pointsNeededA} pts</b> para cerrar</span>
+                                          <span>Rival ({teamB.name.substring(0, 3)}): {match.scoreB} pts</span>
+                                      </div>
+                                  </div>
+
+                                  {/* Mini evolution trajectory */}
+                                  <div className="h-10 relative w-full bg-black/50 rounded border border-white/5 overflow-hidden px-1 mb-1.5 flex items-center">
+                                      <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                                          <polyline 
+                                              points={polyA} 
+                                              fill="none" 
+                                              stroke="#22d3ee" 
+                                              strokeWidth="3" 
+                                              strokeLinecap="round"
+                                              strokeLinejoin="round"
+                                          />
+                                          <circle 
+                                              cx={ptsCount >= 2 ? 100 : 50} 
+                                              cy={Math.round(100 - setProb.probA)} 
+                                              r="4" 
+                                              fill="#22d3ee" 
+                                              stroke="#ffffff" 
+                                              strokeWidth="1.5"
+                                          />
+                                      </svg>
+                                      <div className="absolute left-2 text-[8px] text-cyan-300 font-mono font-bold">TENDENCIA SET</div>
+                                  </div>
+
+                                  {/* Status footer */}
+                                  <div className="flex justify-between items-center text-[9px] text-slate-400 pt-1 font-bold">
+                                      <span>Pronóstico en vivo</span>
+                                      <span className={setProb.momentum === 'A' ? 'text-cyan-400 font-black flex items-center gap-1' : 'text-slate-400'}>
+                                          {setProb.momentum === 'A' ? '🔥 Racha favorable para ganar' : 'En disputa directa'}
+                                      </span>
+                                  </div>
+                              </div>
+                          </div>
+                      );
+                  }
+
+                  // RENDER SINGLE TEAM VIEW: TEAM B
+                  if (winTeamMode === 'teamB') {
+                      const isServing = match.servingTeamId === teamB.id;
+                      const progressPct = Math.min(100, Math.round((match.scoreB / setProb.targetScore) * 100));
+                      return (
+                          <div className="relative w-full bg-[#120a15]/95 border-r-4 border-rose-500 rounded-xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.9)] backdrop-blur-xl border border-white/10">
+                              <div className="flex flex-col relative w-full pt-3 pb-3 px-4">
+                                  {/* Top Header */}
+                                  <div className="flex justify-between items-center mb-2.5 pb-2 border-b border-white/10">
+                                      <span className="text-[9px] font-black text-rose-400 bg-rose-950/80 px-2 py-0.5 rounded border border-rose-500/30 uppercase tracking-widest">
+                                          {teamB.name}
+                                      </span>
+                                      <div className="flex items-center gap-2">
+                                          <span className="text-[11px] font-black tracking-widest text-white uppercase">PREDICCIÓN SET {match.currentSet}</span>
+                                          <div className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse shadow-[0_0_10px_#f43f5e]"></div>
+                                      </div>
+                                  </div>
+
+                                  {/* Main probability display for Team B */}
+                                  <div className="flex items-center justify-between bg-black/60 rounded-lg p-3 border border-white/5 mb-2.5">
+                                      <div className="flex flex-col">
+                                          <span className="text-3xl font-mono font-black text-rose-400 leading-none drop-shadow-[0_0_12px_rgba(244,63,94,0.5)]">
+                                              {setProb.probB}%
+                                          </span>
+                                          <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider mt-1">PROBABILIDAD</span>
+                                      </div>
+                                      <div className="flex items-center gap-3">
+                                          <div className="flex flex-col items-end">
+                                              <span className="text-xs font-black text-white uppercase tracking-wider">{teamB.name}</span>
+                                              <span className="text-[10px] text-rose-300 font-bold mt-0.5 flex items-center gap-1">
+                                                  {setProb.status === 'set_point_B' && (
+                                                      <span className="text-amber-400 font-black animate-pulse mr-1">★ PUNTO DE SET</span>
+                                                  )}
+                                                  {isServing ? '🏐 Al Saque' : '🛡️ En Recepción'}
+                                              </span>
+                                          </div>
+                                          <div className="w-12 h-12 rounded-lg bg-rose-500/20 border border-rose-400/40 flex items-center justify-center overflow-hidden">
+                                              {teamB.logoUrl ? (
+                                                  <img src={teamB.logoUrl} alt={teamB.name} className="w-full h-full object-contain p-1" />
+                                              ) : (
+                                                  <span className="text-xl font-black text-rose-400">{teamB.name.substring(0, 2).toUpperCase()}</span>
+                                              )}
+                                          </div>
+                                      </div>
+                                  </div>
+
+                                  {/* Progress bar towards target score */}
+                                  <div className="space-y-1 mb-2.5 bg-black/40 p-2.5 rounded-lg border border-white/5">
+                                      <div className="flex justify-between text-[10px] font-bold">
+                                          <span className="text-slate-400">Meta: <b className="text-rose-400 font-mono">{setProb.targetScore} pts</b></span>
+                                          <span className="text-slate-300">Marcador Actual: <b className="text-white font-mono">{match.scoreB}</b></span>
+                                      </div>
+                                      <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden relative">
+                                          <div className="h-full bg-gradient-to-r from-rose-600 to-rose-400 rounded-full transition-all duration-500 shadow-[0_0_8px_#f43f5e]" style={{ width: `${progressPct}%` }}></div>
+                                      </div>
+                                      <div className="flex justify-between items-center text-[9px] pt-1 text-slate-400 font-medium">
+                                          <span>Rival ({teamA.name.substring(0, 3)}): {match.scoreA} pts</span>
+                                          <span>Faltan <b className="text-rose-300 font-black">{setProb.pointsNeededB} pts</b> para cerrar</span>
+                                      </div>
+                                  </div>
+
+                                  {/* Mini evolution trajectory */}
+                                  <div className="h-10 relative w-full bg-black/50 rounded border border-white/5 overflow-hidden px-1 mb-1.5 flex items-center">
+                                      <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                                          <polyline 
+                                              points={polyB} 
+                                              fill="none" 
+                                              stroke="#f43f5e" 
+                                              strokeWidth="3" 
+                                              strokeLinecap="round"
+                                              strokeLinejoin="round"
+                                          />
+                                          <circle 
+                                              cx={ptsCount >= 2 ? 100 : 50} 
+                                              cy={Math.round(setProb.probA)} 
+                                              r="4" 
+                                              fill="#f43f5e" 
+                                              stroke="#ffffff" 
+                                              strokeWidth="1.5"
+                                          />
+                                      </svg>
+                                      <div className="absolute right-2 text-[8px] text-rose-300 font-mono font-bold">TENDENCIA SET</div>
+                                  </div>
+
+                                  {/* Status footer */}
+                                  <div className="flex justify-between items-center text-[9px] text-slate-400 pt-1 font-bold">
+                                      <span className={setProb.momentum === 'B' ? 'text-rose-400 font-black flex items-center gap-1' : 'text-slate-400'}>
+                                          {setProb.momentum === 'B' ? '🔥 Racha favorable para ganar' : 'En disputa directa'}
+                                      </span>
+                                      <span>Pronóstico en vivo</span>
+                                  </div>
+                              </div>
+                          </div>
+                      );
+                  }
+
+                  // DEFAULT: COMPARATIVE VIEW (BOTH TEAMS)
                   return (
                       <div className="relative w-full bg-[#0d0f1f]/95 border-l-4 border-cyan-400 rounded-xl overflow-hidden shadow-[0_15px_40px_rgba(0,0,0,0.85)] backdrop-blur-xl border border-white/10">
                           <div className="flex flex-col relative w-full pt-3 pb-2 px-3">
@@ -2188,10 +2692,10 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
                                           {match.scoreA} - {match.scoreB}
                                       </div>
                                       {setProb.status === 'set_point_A' && (
-                                          <span className="text-[8px] font-black text-amber-400 uppercase mt-1 animate-pulse">SET POINT A</span>
+                                          <span className="text-[8px] font-black text-amber-400 uppercase mt-1 animate-pulse">PUNTO DE SET A</span>
                                       )}
                                       {setProb.status === 'set_point_B' && (
-                                          <span className="text-[8px] font-black text-amber-400 uppercase mt-1 animate-pulse">SET POINT B</span>
+                                          <span className="text-[8px] font-black text-amber-400 uppercase mt-1 animate-pulse">PUNTO DE SET B</span>
                                       )}
                                       {setProb.servingAdvantage !== 'none' && (
                                           <span className="text-[8px] text-cyan-300 font-bold uppercase mt-0.5">
@@ -2213,15 +2717,6 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
                                   <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 border-t border-white/15 border-dashed"></div>
 
                                   <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-                                      {/* Gradient area */}
-                                      <defs>
-                                          <linearGradient id="probGrad" x1="0" y1="0" x2="0" y2="1">
-                                              <stop offset="0%" stopColor="#22d3ee" stopOpacity="0.4"/>
-                                              <stop offset="50%" stopColor="#22d3ee" stopOpacity="0.05"/>
-                                              <stop offset="100%" stopColor="#f43f5e" stopOpacity="0.4"/>
-                                          </linearGradient>
-                                      </defs>
-                                      {/* Trajectory Polyline */}
                                       <polyline 
                                           points={polyA} 
                                           fill="none" 
@@ -2230,7 +2725,6 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
                                           strokeLinecap="round"
                                           strokeLinejoin="round"
                                       />
-                                      {/* Current Point Dot */}
                                       <circle 
                                           cx={ptsCount >= 2 ? 100 : 50} 
                                           cy={Math.round(100 - setProb.probA)} 
@@ -2272,7 +2766,7 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
                  <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 w-full h-1 bg-white z-10 shadow-[0_5px_15px_rgba(0,0,0,0.5)]"></div>
                  <div className="absolute inset-x-4 top-[33%] w-[calc(100%-2rem)] h-1 bg-white/50"></div>
                  <div className="absolute inset-x-4 top-[66%] w-[calc(100%-2rem)] h-1 bg-white/50"></div>
-                 <div className="absolute text-[8rem] font-black text-rose-500/20 italic tracking-tighter top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">VOLLEYTV</div>
+                 <div className="absolute text-[8rem] font-black text-rose-500/20 italic tracking-tighter top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">VOLEIBOL TV</div>
                  
                  {/* 3D Balls (Fake positions for representation, as we don't track XY currently) */}
                  <div className="absolute inset-0">
@@ -2289,13 +2783,13 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
 
                  {/* Zone Overlays */}
                  <div className="absolute top-[10%] right-10 bg-[#302766] text-white font-bold px-4 py-1 flex items-center gap-2 border border-blue-400/50 shadow-xl">
-                     <span className="text-sm">Outer Zone</span> <span className="text-xl font-black">15%</span>
+                     <span className="text-sm">Zona Externa</span> <span className="text-xl font-black">15%</span>
                  </div>
                  <div className="absolute top-[35%] right-10 bg-[#302766] text-white font-bold px-4 py-1 flex items-center gap-2 border border-blue-400/50 shadow-xl">
-                     <span className="text-sm">Mid Zone</span> <span className="text-xl font-black">38%</span>
+                     <span className="text-sm">Zona Media</span> <span className="text-xl font-black">38%</span>
                  </div>
                  <div className="absolute top-[60%] right-10 bg-[#302766] text-white font-bold px-4 py-1 flex items-center gap-2 border border-blue-400/50 shadow-xl">
-                     <span className="text-sm">Target Zone</span> <span className="text-xl font-black">47%</span>
+                     <span className="text-sm">Zona Diana / Objetivo</span> <span className="text-xl font-black">47%</span>
                  </div>
               </div>
 
@@ -2305,8 +2799,8 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
                        {teamA.logoUrl ? <img src={teamA.logoUrl} className="h-8"/> : <span className="text-2xl">{teamA.name.substring(0,3).toUpperCase()}</span>}
                    </div>
                    <div className="flex-1 text-center bg-transparent items-center justify-center flex flex-col">
-                       <span className="text-sm tracking-widest leading-none mt-1">RECEIVER ACCURACY</span>
-                       <span className="text-[10px] text-white/50 tracking-widest leading-none mt-1">SECOND CONTACT</span>
+                       <span className="text-sm tracking-widest leading-none mt-1">EFECTIVIDAD DE RECEPCIÓN</span>
+                       <span className="text-[10px] text-white/50 tracking-widest leading-none mt-1">SEGUNDO CONTACTO / ARMADO</span>
                    </div>
                    <div className="bg-pink-600 h-full w-20 flex items-center justify-center flex-col text-sm tracking-widest leading-none">
                        SET {match.currentSet}
@@ -2503,7 +2997,7 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
                                    </h1>
                                    <div className="mt-0.5 flex justify-center">
                                        <div className="text-white/90 font-bold uppercase tracking-[0.2em] text-[10px] md:text-xs bg-white/10 px-3 py-0.5 rounded-full border border-white/10">
-                                           {pointBanner.text === 'MATCH POINT' ? 'PUNTO DE PARTIDO' : 'PUNTO DE SET'}
+                                           {pointBanner.text.includes('PARTIDO') ? 'PUNTO DEFINITIVO' : 'PUNTO DE CIERRE'}
                                        </div>
                                    </div>
                                </div>

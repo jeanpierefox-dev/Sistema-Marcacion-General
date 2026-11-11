@@ -1753,49 +1753,239 @@ export const App: React.FC = () => {
                                         </div>
                                     </div>
 
-                                    <div className="flex flex-col w-full justify-center items-center bg-black/30 rounded p-2 mb-4 border border-white/5">
-                                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center justify-center gap-2 w-full mb-2">
-                                            Stats & Gráficos
-                                        </span>
-                                        <div className="flex gap-1 justify-center flex-wrap w-full">
-                                            <button 
-                                                onClick={() => updateLiveMatch(prev => prev ? {...prev, tvSettings: {...(prev.tvSettings || {style:'horizontal'}), showSetStatsExt: !(prev.tvSettings?.showSetStatsExt)}} : null)} 
-                                                className={`px-3 py-1 rounded text-[10px] font-bold uppercase tracking-widest transition ${liveMatch.tvSettings?.showSetStatsExt ? 'bg-purple-600 text-white' : 'bg-slate-700 text-slate-400'}`}
-                                            >
-                                                Stats Set (%)
-                                            </button>
-                                            <button 
-                                                onClick={() => updateLiveMatch(prev => prev ? {...prev, showStats: !(prev.showStats && prev.statsSetIndex === undefined), statsSetIndex: undefined} : null)} 
-                                                className={`px-3 py-1 rounded text-[10px] font-bold uppercase tracking-widest transition ${liveMatch.showStats && liveMatch.statsSetIndex === undefined ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-400'}`}
-                                            >
-                                                Stats General
-                                            </button>
-                                            <button 
-                                                onClick={() => updateLiveMatch(prev => prev ? {...prev, tvSettings: {...(prev.tvSettings || {style:'horizontal'}), showPointEvolution: !(prev.tvSettings?.showPointEvolution)}} : null)} 
-                                                className={`px-3 py-1 rounded text-[10px] font-bold uppercase tracking-widest transition ${liveMatch.tvSettings?.showPointEvolution ? 'bg-orange-600 text-white' : 'bg-slate-700 text-slate-400'}`}
-                                            >
-                                                Evol. Puntos
-                                            </button>
-                                            <button 
-                                                onClick={() => updateLiveMatch(prev => prev ? {...prev, tvSettings: {...(prev.tvSettings || {style:'horizontal'}), showWinPrediction: !(prev.tvSettings?.showWinPrediction)}} : null)} 
-                                                className={`px-3 py-1 rounded text-[10px] font-bold uppercase tracking-widest transition ${liveMatch.tvSettings?.showWinPrediction ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-400'}`}
-                                            >
-                                                Predicción Set
-                                            </button>
-                                            <button 
-                                                onClick={() => updateLiveMatch(prev => prev ? {...prev, tvSettings: {...(prev.tvSettings || {style:'horizontal'}), showWinPrediction: !(prev.tvSettings?.showWinPrediction)}} : null)} 
-                                                className={`px-3 py-1 rounded text-[10px] font-bold uppercase tracking-widest transition ${liveMatch.tvSettings?.showWinPrediction ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-400'}`}
-                                            >
-                                                Predicción Set
-                                            </button>
-                                            <button 
-                                                onClick={() => updateLiveMatch(prev => prev ? {...prev, tvSettings: {...(prev.tvSettings || {style:'horizontal'}), showServeSpeed: !(prev.tvSettings?.showServeSpeed)}} : null)} 
-                                                className={`px-3 py-1 rounded text-[10px] font-bold uppercase tracking-widest transition ${liveMatch.tvSettings?.showServeSpeed ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-400'}`}
-                                            >
-                                                Saque
-                                            </button>
-                                        </div>
-                                    </div>
+                                    {(() => {
+                                        const curFixture = activeTournament.fixtures?.find(f => f.id === liveMatch.matchId);
+                                        const curTeamA = activeTournament.teams?.find(t => t.id === curFixture?.teamAId);
+                                        const curTeamB = activeTournament.teams?.find(t => t.id === curFixture?.teamBId);
+                                        const isServingA = liveMatch.servingTeamId === curTeamA?.id;
+                                        const serverPlayer = isServingA ? liveMatch.rotationA[0] : liveMatch.rotationB[0];
+                                        const serverPlayerId = serverPlayer?.id || "";
+                                        const servingTeamObj = isServingA ? curTeamA : curTeamB;
+                                        const serverPlayerObj = serverPlayer || servingTeamObj?.players?.find(p => p.id === serverPlayerId);
+
+                                        return (
+                                            <div className="flex flex-col w-full bg-black/40 rounded-xl p-3 mb-4 border border-white/10 space-y-3">
+                                                {/* Encabezado */}
+                                                <div className="flex items-center justify-between border-b border-white/10 pb-1.5">
+                                                    <span className="text-xs font-black text-cyan-300 uppercase tracking-widest flex items-center gap-1.5">
+                                                        <span>📊</span> Gráficos & Estadísticas en TV
+                                                    </span>
+                                                    <span className="text-[9px] text-slate-400 font-mono">Control de Superposiciones</span>
+                                                </div>
+
+                                                {/* 1. Estadísticas Numéricas */}
+                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                    <span className="text-[10px] font-bold text-slate-400 uppercase w-full">Estadísticas Numéricas:</span>
+                                                    <button 
+                                                        onClick={() => updateLiveMatch(prev => prev ? {...prev, tvSettings: {...(prev.tvSettings || {style:'horizontal'}), showSetStatsExt: !(prev.tvSettings?.showSetStatsExt)}} : null)} 
+                                                        className={`px-3 py-1 rounded text-[10px] font-black uppercase tracking-wider transition ${liveMatch.tvSettings?.showSetStatsExt ? 'bg-purple-600 text-white shadow-[0_0_10px_rgba(168,85,247,0.5)]' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
+                                                    >
+                                                        Stats Set (%)
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => updateLiveMatch(prev => prev ? {...prev, showStats: !(prev.showStats && prev.statsSetIndex === undefined), statsSetIndex: undefined} : null)} 
+                                                        className={`px-3 py-1 rounded text-[10px] font-black uppercase tracking-wider transition ${liveMatch.showStats && liveMatch.statsSetIndex === undefined ? 'bg-indigo-600 text-white shadow-[0_0_10px_rgba(99,102,241,0.5)]' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
+                                                    >
+                                                        Stats General
+                                                    </button>
+                                                </div>
+
+                                                {/* 2. Evolución de Puntos (Opción 1: General / Opción 2: Tiempo Técnico por Equipo con Cámara) */}
+                                                <div className="flex flex-col gap-1.5 pt-1 border-t border-white/5">
+                                                    <span className="text-[10px] font-bold text-slate-400 uppercase flex items-center justify-between">
+                                                        <span>📈 Evolución de Puntos / Tiempo Técnico:</span>
+                                                        {liveMatch.tvSettings?.showPointEvolution && (
+                                                            <span className="text-[9px] text-orange-400 font-mono font-bold animate-pulse">ACTIVO EN TV</span>
+                                                        )}
+                                                    </span>
+                                                    <div className="grid grid-cols-3 gap-1 w-full">
+                                                        <button 
+                                                            onClick={() => {
+                                                                updateLiveMatch(prev => {
+                                                                    if (!prev) return null;
+                                                                    const isCurrentlyActive = prev.tvSettings?.showPointEvolution && (prev.tvSettings?.pointEvolutionMode === 'general' || !prev.tvSettings?.pointEvolutionMode);
+                                                                    return {
+                                                                        ...prev,
+                                                                        tvSettings: {
+                                                                            ...(prev.tvSettings || {style:'horizontal'}),
+                                                                            showPointEvolution: !isCurrentlyActive,
+                                                                            pointEvolutionMode: 'general'
+                                                                        }
+                                                                    };
+                                                                });
+                                                            }} 
+                                                            className={`px-2 py-1.5 rounded text-[9px] font-black uppercase tracking-wider transition text-center ${liveMatch.tvSettings?.showPointEvolution && (liveMatch.tvSettings?.pointEvolutionMode === 'general' || !liveMatch.tvSettings?.pointEvolutionMode) ? 'bg-orange-500 text-white shadow-[0_0_10px_rgba(249,115,22,0.5)]' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
+                                                            title="Opción 1: Evolución general durante el partido para ambos equipos"
+                                                        >
+                                                            Evol. General
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => {
+                                                                updateLiveMatch(prev => {
+                                                                    if (!prev) return null;
+                                                                    const isCurrentlyActive = prev.tvSettings?.showPointEvolution && prev.tvSettings?.pointEvolutionMode === 'teamA';
+                                                                    return {
+                                                                        ...prev,
+                                                                        tvSettings: {
+                                                                            ...(prev.tvSettings || {style:'horizontal'}),
+                                                                            showPointEvolution: !isCurrentlyActive,
+                                                                            pointEvolutionMode: 'teamA'
+                                                                        }
+                                                                    };
+                                                                });
+                                                            }} 
+                                                            className={`px-2 py-1.5 rounded text-[9px] font-black uppercase tracking-wider transition text-center ${liveMatch.tvSettings?.showPointEvolution && liveMatch.tvSettings?.pointEvolutionMode === 'teamA' ? 'bg-cyan-500 text-slate-950 shadow-[0_0_10px_rgba(34,211,238,0.5)] font-black' : 'bg-slate-800 text-cyan-400 hover:bg-slate-700'}`}
+                                                            title="Opción 2: Pantalla de Tiempo Técnico para Equipo Izquierdo con Cámara y desglose"
+                                                        >
+                                                            ⏱️ T.T. Eq. Izq (A)
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => {
+                                                                updateLiveMatch(prev => {
+                                                                    if (!prev) return null;
+                                                                    const isCurrentlyActive = prev.tvSettings?.showPointEvolution && prev.tvSettings?.pointEvolutionMode === 'teamB';
+                                                                    return {
+                                                                        ...prev,
+                                                                        tvSettings: {
+                                                                            ...(prev.tvSettings || {style:'horizontal'}),
+                                                                            showPointEvolution: !isCurrentlyActive,
+                                                                            pointEvolutionMode: 'teamB'
+                                                                        }
+                                                                    };
+                                                                });
+                                                            }} 
+                                                            className={`px-2 py-1.5 rounded text-[9px] font-black uppercase tracking-wider transition text-center ${liveMatch.tvSettings?.showPointEvolution && liveMatch.tvSettings?.pointEvolutionMode === 'teamB' ? 'bg-rose-500 text-white shadow-[0_0_10px_rgba(244,63,94,0.5)] font-black' : 'bg-slate-800 text-rose-400 hover:bg-slate-700'}`}
+                                                            title="Opción 2: Pantalla de Tiempo Técnico para Equipo Derecho con Cámara y desglose"
+                                                        >
+                                                            ⏱️ T.T. Eq. Der (B)
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                {/* 3. Predicción del Set (Por Equipo o Ambos) */}
+                                                <div className="flex flex-col gap-1.5 pt-1 border-t border-white/5">
+                                                    <span className="text-[10px] font-bold text-slate-400 uppercase flex items-center justify-between">
+                                                        <span>🎯 Predicción del Set:</span>
+                                                        {liveMatch.tvSettings?.showWinPrediction && (
+                                                            <span className="text-[9px] text-emerald-400 font-mono font-bold animate-pulse">ACTIVO EN TV</span>
+                                                        )}
+                                                    </span>
+                                                    <div className="grid grid-cols-3 gap-1 w-full">
+                                                        <button 
+                                                            onClick={() => {
+                                                                updateLiveMatch(prev => {
+                                                                    if (!prev) return null;
+                                                                    const isCurrentlyActive = prev.tvSettings?.showWinPrediction && prev.tvSettings?.winPredictionTeam === 'teamA';
+                                                                    return {
+                                                                        ...prev,
+                                                                        tvSettings: {
+                                                                            ...(prev.tvSettings || {style:'horizontal'}),
+                                                                            showWinPrediction: !isCurrentlyActive,
+                                                                            winPredictionTeam: 'teamA'
+                                                                        }
+                                                                    };
+                                                                });
+                                                            }} 
+                                                            className={`px-2 py-1.5 rounded text-[9px] font-black uppercase tracking-wider transition text-center ${liveMatch.tvSettings?.showWinPrediction && liveMatch.tvSettings?.winPredictionTeam === 'teamA' ? 'bg-cyan-500 text-slate-950 shadow-[0_0_10px_rgba(34,211,238,0.5)]' : 'bg-slate-800 text-cyan-400 hover:bg-slate-700'}`}
+                                                            title="Predicción enfocada exclusivamente en el Equipo A"
+                                                        >
+                                                            🔵 Pred. Eq. A
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => {
+                                                                updateLiveMatch(prev => {
+                                                                    if (!prev) return null;
+                                                                    const isCurrentlyActive = prev.tvSettings?.showWinPrediction && prev.tvSettings?.winPredictionTeam === 'teamB';
+                                                                    return {
+                                                                        ...prev,
+                                                                        tvSettings: {
+                                                                            ...(prev.tvSettings || {style:'horizontal'}),
+                                                                            showWinPrediction: !isCurrentlyActive,
+                                                                            winPredictionTeam: 'teamB'
+                                                                        }
+                                                                    };
+                                                                });
+                                                            }} 
+                                                            className={`px-2 py-1.5 rounded text-[9px] font-black uppercase tracking-wider transition text-center ${liveMatch.tvSettings?.showWinPrediction && liveMatch.tvSettings?.winPredictionTeam === 'teamB' ? 'bg-rose-500 text-white shadow-[0_0_10px_rgba(244,63,94,0.5)]' : 'bg-slate-800 text-rose-400 hover:bg-slate-700'}`}
+                                                            title="Predicción enfocada exclusivamente en el Equipo B"
+                                                        >
+                                                            🔴 Pred. Eq. B
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => {
+                                                                updateLiveMatch(prev => {
+                                                                    if (!prev) return null;
+                                                                    const isCurrentlyActive = prev.tvSettings?.showWinPrediction && (prev.tvSettings?.winPredictionTeam === 'both' || !prev.tvSettings?.winPredictionTeam);
+                                                                    return {
+                                                                        ...prev,
+                                                                        tvSettings: {
+                                                                            ...(prev.tvSettings || {style:'horizontal'}),
+                                                                            showWinPrediction: !isCurrentlyActive,
+                                                                            winPredictionTeam: 'both'
+                                                                        }
+                                                                    };
+                                                                });
+                                                            }} 
+                                                            className={`px-2 py-1.5 rounded text-[9px] font-black uppercase tracking-wider transition text-center ${liveMatch.tvSettings?.showWinPrediction && (liveMatch.tvSettings?.winPredictionTeam === 'both' || !liveMatch.tvSettings?.winPredictionTeam) ? 'bg-emerald-500 text-slate-950 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+                                                            title="Predicción comparativa general de ambos equipos"
+                                                        >
+                                                            👥 Ambos
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                {/* 4. Radar de Saque Dinámico (Jugador en Rotación Zona 1 & Trayectoria Balón) */}
+                                                <div className="flex flex-col gap-1.5 pt-1 border-t border-white/5">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-[10px] font-bold text-slate-400 uppercase">⚡ Radar de Saque (Zona 1):</span>
+                                                        <span className="text-[9px] text-emerald-400 font-mono font-bold bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-500/30">
+                                                            {servingTeamObj?.name?.substring(0,3)} • Z1: #{serverPlayerObj?.number || '1'}
+                                                        </span>
+                                                    </div>
+                                                    <button 
+                                                        onClick={() => {
+                                                            const isJump = Math.random() > 0.45;
+                                                            const distanceMeters = +(15.2 + Math.random() * 1.5).toFixed(1);
+                                                            const flightTimeSec = +(isJump ? (0.45 + Math.random() * 0.09) : (0.58 + Math.random() * 0.12)).toFixed(2);
+                                                            const speedKmh = Math.round((distanceMeters / flightTimeSec) * 3.6);
+
+                                                            updateLiveMatch(prev => {
+                                                                if (!prev) return null;
+                                                                const isCurrentlyActive = prev.tvSettings?.showServeSpeed;
+                                                                return {
+                                                                    ...prev,
+                                                                    tvSettings: {
+                                                                        ...(prev.tvSettings || {style:'horizontal'}),
+                                                                        showServeSpeed: !isCurrentlyActive,
+                                                                        serveSpeedData: {
+                                                                            speedKmh: speedKmh,
+                                                                            speed: speedKmh,
+                                                                            distanceMeters: distanceMeters,
+                                                                            distance: distanceMeters,
+                                                                            flightTimeSec: flightTimeSec,
+                                                                            flightTime: flightTimeSec,
+                                                                            trajectoryType: isJump ? 'jump' : 'float',
+                                                                            serveType: isJump ? 'jump' : 'tactical',
+                                                                            serverPlayerId: serverPlayerId
+                                                                        }
+                                                                    }
+                                                                };
+                                                            });
+                                                        }} 
+                                                        className={`w-full py-2 px-3 rounded-lg text-xs font-black uppercase tracking-wider flex items-center justify-between transition ${liveMatch.tvSettings?.showServeSpeed ? 'bg-emerald-500 text-slate-950 shadow-[0_0_15px_rgba(16,185,129,0.5)]' : 'bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/20'}`}
+                                                    >
+                                                        <span className="flex items-center gap-1.5">
+                                                            <span>🏐</span>
+                                                            <span>{serverPlayerObj ? `#${serverPlayerObj.number} ${serverPlayerObj.name}` : 'Sacador en Rotación'}</span>
+                                                        </span>
+                                                        <span className="font-mono text-[10px] bg-black/40 px-2 py-0.5 rounded">
+                                                            {liveMatch.tvSettings?.showServeSpeed ? 'VISIBLE EN TV (Desactivar)' : 'Lanzar Radar Saque TV'}
+                                                        </span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })()}
 
                                     {/* SECCIÓN 1: ESTADÍSTICAS EQ (ALAS LATERALES TV) CON SELECCIÓN DE JUGADOR */}
                                     <div className="border border-white/10 rounded overflow-hidden mb-3">
@@ -1892,7 +2082,7 @@ export const App: React.FC = () => {
                                     {/* SECCIÓN 2: VERSUS CARA A CARA POR POSICIÓN Y JUGADOR + LANZAR FOTO */}
                                     <div className="border border-white/10 rounded overflow-hidden">
                                         <div className="bg-purple-950/40 px-3 py-2 flex items-center justify-between text-[10px] font-bold uppercase tracking-widest text-purple-300 border-b border-purple-500/20">
-                                            <span className="flex items-center gap-1.5"><span>⚔️</span> Versus Cara a Cara (TV)</span>
+                                            <span className="flex items-center gap-1.5"><span>⚔️</span> Cuadro Comparativo (TV)</span>
                                             {liveMatch.tvSettings?.showVersus && (
                                                 <span className="bg-purple-600 text-white px-2 py-0.5 rounded text-[8px] font-black animate-pulse">EN VIVO EN TV</span>
                                             )}
@@ -2061,7 +2251,7 @@ export const App: React.FC = () => {
                                                         : 'bg-slate-800 hover:bg-slate-700 text-purple-300 border border-purple-500/30'
                                                 }`}
                                             >
-                                                <span>⚔️</span> {liveMatch.tvSettings?.showVersus ? 'Quitar Versus de TV (Activo)' : 'Lanzar Versus Cara a Cara en TV'}
+                                                <span>⚔️</span> {liveMatch.tvSettings?.showVersus ? 'Quitar Cuadro Comparativo de TV (Activo)' : 'Lanzar Cuadro Comparativo en TV'}
                                             </button>
                                         </div>
                                     </div>

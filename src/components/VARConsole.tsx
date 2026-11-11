@@ -13,7 +13,7 @@ interface VARConsoleProps {
   onClose?: () => void;
 }
 
-type CameraAngleType = 'attack' | 'serve' | 'halcon' | 'crowd' | 'wireless';
+type CameraAngleType = 'attack' | 'serve' | 'halcon' | 'crowd' | 'wireless' | 'timeout';
 
 interface RecordedFrame {
   timestamp: number;
@@ -59,7 +59,8 @@ export const VARConsole: React.FC<VARConsoleProps> = ({
     serve: { sourceType: 'simulation', label: 'Simulación Línea de Saque' },
     halcon: { sourceType: 'simulation', label: 'Simulación 3D Ojo de Halcón' },
     crowd: { sourceType: 'simulation', label: 'Simulación Plano General' },
-    wireless: { sourceType: 'wireless', label: 'Cámara Celular Auxiliar' }
+    wireless: { sourceType: 'wireless', label: 'Cámara Celular Auxiliar' },
+    timeout: { sourceType: 'simulation', label: 'Cámara Tiempo Técnico / Banca' }
   });
   const [modalSection, setModalSection] = useState<CameraAngleType>('attack');
 
@@ -74,14 +75,16 @@ export const VARConsole: React.FC<VARConsoleProps> = ({
     serve: [],
     halcon: [],
     crowd: [],
-    wireless: []
+    wireless: [],
+    timeout: []
   });
   const [bufferLengths, setBufferLengths] = useState<{ [key in CameraAngleType]: number }>({
     attack: 0,
     serve: 0,
     halcon: 0,
     crowd: 0,
-    wireless: 0
+    wireless: 0,
+    timeout: 0
   });
 
   const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -184,7 +187,7 @@ export const VARConsole: React.FC<VARConsoleProps> = ({
       const now = Date.now();
 
       // Generar frame para cada ángulo
-      (['attack', 'serve', 'halcon', 'crowd', 'wireless'] as CameraAngleType[]).forEach(angle => {
+      (['attack', 'serve', 'halcon', 'crowd', 'wireless', 'timeout'] as CameraAngleType[]).forEach(angle => {
         rCtx.clearRect(0, 0, 480, 270);
         drawAngleFrame(angle, rCtx, 480, 270, now);
         const dataUrl = renderCanvas.toDataURL('image/jpeg', 0.6);
@@ -204,7 +207,8 @@ export const VARConsole: React.FC<VARConsoleProps> = ({
         serve: buffersRef.current.serve.length,
         halcon: buffersRef.current.halcon.length,
         crowd: buffersRef.current.crowd.length,
-        wireless: buffersRef.current.wireless.length
+        wireless: buffersRef.current.wireless.length,
+        timeout: buffersRef.current.timeout.length
       });
     }, 250);
 
@@ -378,6 +382,64 @@ export const VARConsole: React.FC<VARConsoleProps> = ({
       ctx.fillRect(w * 0.4 - 30 + footPos, h * 0.6, 24, 12);
 
       drawHudOverlay(ctx, w, h, 'CAM-2 SAQUE / CONTROL DE FALTA DE PIE', timeMs);
+
+    } else if (angle === 'timeout') {
+      // Simulación de Tiempo Técnico: Banca, Entrenador y Charla Táctica
+      ctx.fillStyle = '#0a101d';
+      ctx.fillRect(0, 0, w, h);
+
+      // Fondo de la zona de banca / área técnica
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(0, h * 0.45, w, h * 0.55);
+
+      // Cancha / Piso de madera
+      ctx.fillStyle = '#b45309';
+      ctx.fillRect(0, h * 0.75, w, h * 0.25);
+
+      // Pizarra táctica del entrenador
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(w * 0.42, h * 0.35, 75, 55);
+      ctx.strokeStyle = '#0284c7';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(w * 0.42, h * 0.35, 75, 55);
+
+      // Esquema táctico en la pizarra
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(w * 0.42 + 20, h * 0.35 + 20, 6, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = '#3b82f6';
+      ctx.beginPath();
+      ctx.moveTo(w * 0.42 + 20, h * 0.35 + 26);
+      ctx.lineTo(w * 0.42 + 55, h * 0.35 + 40);
+      ctx.stroke();
+
+      // Siluetas de jugadores reunidos en huddle
+      const pulse = Math.sin(timeMs / 600) * 2;
+      const playerColors = ['#06b6d4', '#3b82f6', '#6366f1', '#06b6d4', '#3b82f6', '#f59e0b'];
+      playerColors.forEach((col, idx) => {
+        const anglePos = (idx / 6) * Math.PI * 2;
+        const px = w * 0.5 + Math.cos(anglePos) * 65 + pulse;
+        const py = h * 0.62 + Math.sin(anglePos) * 25;
+        ctx.fillStyle = col;
+        ctx.beginPath();
+        ctx.arc(px, py, 11, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillRect(px - 9, py + 11, 18, 22);
+      });
+
+      // Cronómetro de tiempo técnico
+      const secRemaining = 30 - (Math.floor(timeMs / 1000) % 30);
+      ctx.fillStyle = 'rgba(0,0,0,0.7)';
+      ctx.fillRect(w * 0.32, 10, w * 0.36, 26);
+      ctx.fillStyle = '#facc15';
+      ctx.font = 'bold 12px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(`⏱️ TIEMPO TÉCNICO: 00:${secRemaining < 10 ? '0' : ''}${secRemaining}`, w / 2, 27);
+      ctx.textAlign = 'left';
+
+      drawHudOverlay(ctx, w, h, 'CAM-6 TIEMPO TÉCNICO - BANCA Y ESTRATEGIA (240 FPS)', timeMs);
 
     } else {
       // Plano General y Público
@@ -694,13 +756,14 @@ export const VARConsole: React.FC<VARConsoleProps> = ({
       </div>
 
       {/* Selector de Secciones del Challenger y Conexión de Cámaras */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
         {[
           { id: 'attack', label: 'Ataque / Bloqueo', icon: '🏐', desc: 'Toque de Red y Manos', defaultLabel: 'Cámara Red / Ataque' },
           { id: 'serve', label: 'Línea de Saque', icon: '🚀', desc: 'Línea y Falta de Pie', defaultLabel: 'Cámara Saque / Fondo' },
           { id: 'halcon', label: 'Ojo de Halcón', icon: '🦅', desc: 'In & Out Milimétrico', defaultLabel: 'Cámara Línea In/Out' },
           { id: 'crowd', label: 'Vista General', icon: '👥', desc: 'Cancha y Árbitros', defaultLabel: 'Cámara Gran Angular' },
-          { id: 'wireless', label: 'Celular Auxiliar', icon: '📱', desc: 'Cámara Móvil P2P', defaultLabel: 'Cámara Móvil Auxiliar' }
+          { id: 'wireless', label: 'Celular Auxiliar', icon: '📱', desc: 'Cámara Móvil P2P', defaultLabel: 'Cámara Móvil Auxiliar' },
+          { id: 'timeout', label: 'Tiempo Técnico', icon: '⏱️', desc: 'Banca y Estrategia', defaultLabel: 'Cámara Tiempo Técnico / Banca' }
         ].map(sec => {
           const isSelected = selectedAngle === sec.id;
           const cfg = sectionConfigs[sec.id as CameraAngleType];
@@ -1236,7 +1299,8 @@ export const VARConsole: React.FC<VARConsoleProps> = ({
           serve: { name: 'Línea de Saque (Fondo)', icon: '🚀', desc: 'Ubica este celular apuntando a la línea de fondo para verificar faltas de pie en el saque.' },
           halcon: { name: 'Ojo de Halcón (Línea In/Out)', icon: '🦅', desc: 'Ubica este celular paralelo a la línea lateral o de fondo para repeticiones milimétricas in/out.' },
           crowd: { name: 'Vista General (Cancha)', icon: '👥', desc: 'Ubica este celular con plano amplio de la cancha y bancos para seguimiento táctico general.' },
-          wireless: { name: 'Cámara Móvil Auxiliar', icon: '📱', desc: 'Cámara celular libre para operadores en cancha o repeticiones dinámicas.' }
+          wireless: { name: 'Cámara Móvil Auxiliar', icon: '📱', desc: 'Cámara celular libre para operadores en cancha o repeticiones dinámicas.' },
+          timeout: { name: 'Tiempo Técnico (Banca y Estrategia)', icon: '⏱️', desc: 'Ubica este celular apuntando al banco del equipo para transmitir el tiempo técnico en vivo.' }
         };
         const currentSecInfo = sectionLabels[targetSection] || sectionLabels.attack;
         const directUrl = getVarDirectUrl(match.matchId, targetSection, currentSecInfo.name);

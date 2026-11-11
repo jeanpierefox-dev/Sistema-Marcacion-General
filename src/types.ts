@@ -155,9 +155,24 @@ export interface LiveMatchState {
     showSetStatsExt?: boolean;
     showMatchStatsExt?: boolean;
     showPointEvolution?: boolean;
+    pointEvolutionMode?: 'general' | 'match' | 'teamA' | 'teamB';
     showTopPlayersExt?: boolean;
     showWinPrediction?: boolean;
+    winPredictionTeam?: 'both' | 'teamA' | 'teamB';
     showReceiverAccuracy?: boolean;
+    serveSpeedData?: {
+      speedKmh?: number;
+      speed?: number;
+      trajectoryType?: 'jump' | 'float' | 'topspin';
+      serveType?: string;
+      distanceMeters?: number;
+      distance?: number;
+      flightTimeSec?: number;
+      flightTime?: number;
+      serverPlayerId?: string;
+    };
+    timeoutCameraActive?: boolean;
+    timeoutCameraTeam?: 'teamA' | 'teamB' | 'both';
   };
 }
 
@@ -167,7 +182,7 @@ export interface VarChallengeState {
   requestingTeamName?: string;
   challengeType: 'attack_touch' | 'net_touch' | 'in_out' | 'serve_foot' | 'general';
   challengeLabel: string;
-  cameraAngle: 'attack' | 'serve' | 'halcon' | 'crowd' | 'wireless';
+  cameraAngle: 'attack' | 'serve' | 'halcon' | 'crowd' | 'wireless' | 'timeout';
   cameraLabel?: string;
   assignedWirelessPeerId?: string;
   replayDataUrl?: string;
