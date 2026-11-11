@@ -1240,22 +1240,12 @@ const TVOverlay: React.FC<TVOverlayProps> = ({
             rotationB={match.rotationB} 
             isVertical={isVertical} 
             servingTeamId={match.servingTeamId}
+            isBroadcast={true}
             initialTab={
               (typeof activeShowRotation === 'string' && ['both', 'teamA', 'teamB'].includes(activeShowRotation))
                 ? (activeShowRotation as 'both' | 'teamA' | 'teamB')
                 : (activeTvSettings?.showRotationMode || 'both')
             }
-            onTabChange={(tab) => {
-              onUpdateMatch?.({ 
-                tvSettings: activeTvSettings ? { ...activeTvSettings, showRotationMode: tab } : undefined 
-              });
-            }}
-            onClose={() => {
-              onUpdateMatch?.({ 
-                showRotation: false,
-                tvSettings: activeTvSettings ? { ...activeTvSettings, showFormations: false, showRotationMode: null } : undefined
-              });
-            }}
           />
       )}
 

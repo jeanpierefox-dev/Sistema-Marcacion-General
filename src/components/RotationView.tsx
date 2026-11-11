@@ -11,6 +11,7 @@ interface RotationViewProps {
   initialTab?: 'both' | 'teamA' | 'teamB';
   onTabChange?: (tab: 'both' | 'teamA' | 'teamB') => void;
   onClose?: () => void;
+  isBroadcast?: boolean;
 }
 
 export const RotationView: React.FC<RotationViewProps> = ({ 
@@ -22,7 +23,8 @@ export const RotationView: React.FC<RotationViewProps> = ({
   servingTeamId,
   initialTab = 'both',
   onTabChange,
-  onClose 
+  onClose,
+  isBroadcast = false 
 }) => {
   // Modo de visualización: ambos separados lado a lado, solo Equipo A, o solo Equipo B
   const [activeTab, setActiveTab] = useState<'both' | 'teamA' | 'teamB'>(initialTab);
@@ -259,69 +261,77 @@ export const RotationView: React.FC<RotationViewProps> = ({
   };
 
   return (
-    <div className={`fixed inset-0 z-[130] flex flex-col items-center justify-center p-3 md:p-6 bg-black/90 backdrop-blur-xl animate-in fade-in duration-200 overflow-y-auto ${
+    <div className={`fixed inset-0 z-[130] flex flex-col items-center justify-center p-3 md:p-6 ${
+      isBroadcast 
+        ? 'pointer-events-none bg-black/25' 
+        : 'bg-black/90 backdrop-blur-xl'
+    } animate-in fade-in duration-200 overflow-y-auto ${
       isVertical ? 'rotate-90 origin-center' : ''
     }`}>
-      <div className="w-full max-w-6xl flex flex-col gap-4 my-auto">
+      <div className={`w-full max-w-6xl flex flex-col gap-4 my-auto ${
+        isBroadcast ? 'scale-90 sm:scale-95 origin-center drop-shadow-[0_20px_50px_rgba(0,0,0,0.85)]' : ''
+      }`}>
         
-        {/* Barra superior con Título, Selector de Vista y Botón Cerrar */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-950/80 border border-white/10 rounded-2xl p-3.5 px-5 shadow-2xl backdrop-blur-md">
-          <div className="flex items-center gap-3">
-            <div className="w-3 h-3 rounded-full bg-cyan-400 animate-ping"></div>
-            <div>
-              <h2 className="text-lg md:text-2xl font-black text-white uppercase italic tracking-wider">
-                Rotación Táctica de Cancha
-              </h2>
-              <p className="text-[10px] md:text-xs text-slate-400">
-                Alineación reglamentaria de cada equipo con zonas 1 a 6
-              </p>
+        {/* Barra superior con Título, Selector de Vista y Botón Cerrar (Solo en modo interactivo/árbitro, NUNCA en transmisión TV) */}
+        {!isBroadcast && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-950/80 border border-white/10 rounded-2xl p-3.5 px-5 shadow-2xl backdrop-blur-md">
+            <div className="flex items-center gap-3">
+              <div className="w-3 h-3 rounded-full bg-cyan-400 animate-ping"></div>
+              <div>
+                <h2 className="text-lg md:text-2xl font-black text-white uppercase italic tracking-wider">
+                  Rotación Táctica de Cancha
+                </h2>
+                <p className="text-[10px] md:text-xs text-slate-400">
+                  Alineación reglamentaria de cada equipo con zonas 1 a 6
+                </p>
+              </div>
             </div>
-          </div>
 
-          {/* Selector de modo: Ambos Equipos o individual */}
-          <div className="flex items-center gap-1.5 bg-slate-900 p-1 rounded-xl border border-white/10">
-            <button
-              onClick={() => handleTabSelect('both')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                activeTab === 'both'
-                  ? 'bg-cyan-500 text-slate-950 shadow-md font-black'
-                  : 'text-slate-400 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              👥 Ambos Equipos
-            </button>
-            <button
-              onClick={() => handleTabSelect('teamA')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                activeTab === 'teamA'
-                  ? 'bg-cyan-600 text-white shadow-md font-black'
-                  : 'text-slate-400 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              🔵 EQ. A: {teamA.name.split(' ')[0]}
-            </button>
-            <button
-              onClick={() => handleTabSelect('teamB')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                activeTab === 'teamB'
-                  ? 'bg-rose-600 text-white shadow-md font-black'
-                  : 'text-slate-400 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              🔴 EQ. B: {teamB.name.split(' ')[0]}
-            </button>
-          </div>
+            {/* Selector de modo: Ambos Equipos o individual */}
+            <div className="flex items-center gap-1.5 bg-slate-900 p-1 rounded-xl border border-white/10">
+              <button
+                onClick={() => handleTabSelect('both')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  activeTab === 'both'
+                    ? 'bg-cyan-500 text-slate-950 shadow-md font-black'
+                    : 'text-slate-400 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                👥 Ambos Equipos
+              </button>
+              <button
+                onClick={() => handleTabSelect('teamA')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  activeTab === 'teamA'
+                    ? 'bg-cyan-600 text-white shadow-md font-black'
+                    : 'text-slate-400 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                🔵 EQ. A: {teamA.name.split(' ')[0]}
+              </button>
+              <button
+                onClick={() => handleTabSelect('teamB')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  activeTab === 'teamB'
+                    ? 'bg-rose-600 text-white shadow-md font-black'
+                    : 'text-slate-400 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                🔴 EQ. B: {teamB.name.split(' ')[0]}
+              </button>
+            </div>
 
-          {/* Botón Cerrar */}
-          {onClose && (
-            <button
-              onClick={onClose}
-              className="bg-red-500/20 hover:bg-red-500 text-red-300 hover:text-white px-3.5 py-1.5 rounded-xl font-bold uppercase text-xs border border-red-500/40 transition-all flex items-center gap-1.5"
-            >
-              <span>✕</span> Cerrar
-            </button>
-          )}
-        </div>
+            {/* Botón Cerrar */}
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="bg-red-500/20 hover:bg-red-500 text-red-300 hover:text-white px-3.5 py-1.5 rounded-xl font-bold uppercase text-xs border border-red-500/40 transition-all flex items-center gap-1.5"
+              >
+                <span>✕</span> Cerrar
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Tableros Tácticos (Separados) */}
         <div className="w-full">

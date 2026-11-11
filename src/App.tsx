@@ -146,6 +146,7 @@ export const App: React.FC = () => {
   // Modals
   const [showSubModal, setShowSubModal] = useState<{teamId: string} | null>(null);
   const [showRotationModal, setShowRotationModal] = useState<{teamId: string} | null>(null);
+  const [showRefereeRotationModal, setShowRefereeRotationModal] = useState(false);
   const [showCloudConfig, setShowCloudConfig] = useState(false);
   const [isCloudConnected, setIsCloudConnected] = useState(false);
 
@@ -1105,6 +1106,7 @@ export const App: React.FC = () => {
   const handleToggleRotationView = (targetMode?: 'both' | 'teamA' | 'teamB' | 'off' | unknown) => {
       if (!liveMatch) return;
       const isCurrentlyActive = Boolean(liveMatch.showRotation || liveMatch.tvSettings?.showRotationMode);
+      const currentMode = liveMatch.tvSettings?.showRotationMode || 'both';
       
       let nextState: boolean;
       let nextMode: 'both' | 'teamA' | 'teamB' | null;
@@ -1113,12 +1115,18 @@ export const App: React.FC = () => {
           nextState = false;
           nextMode = null;
       } else if (typeof targetMode === 'string' && ['both', 'teamA', 'teamB'].includes(targetMode)) {
-          nextState = true;
-          nextMode = targetMode as 'both' | 'teamA' | 'teamB';
+          // If already active with the same mode, clicking it again deactivates it on TV!
+          if (isCurrentlyActive && currentMode === targetMode) {
+              nextState = false;
+              nextMode = null;
+          } else {
+              nextState = true;
+              nextMode = targetMode as 'both' | 'teamA' | 'teamB';
+          }
       } else {
           // Default toggle behavior (handles empty or click event)
           nextState = !isCurrentlyActive;
-          nextMode = nextState ? 'both' : null;
+          nextMode = nextState ? (liveMatch.tvSettings?.showRotationMode || 'both') : null;
       }
 
       const updated = { 
@@ -1693,23 +1701,22 @@ export const App: React.FC = () => {
                                     <div className="flex flex-col w-full bg-black/40 rounded-xl p-2.5 mb-2 border border-white/10 shadow-md">
                                         <div className="flex justify-between items-center mb-1.5">
                                             <span className="text-[11px] font-black text-cyan-300 uppercase tracking-wider flex items-center gap-1.5">
-                                                <span>📋</span> Rotación Táctica (TV)
+                                                <span>📋</span> Rotación TV
                                             </span>
-                                            <span className={`text-[9px] font-mono font-black px-2 py-0.5 rounded uppercase ${
-                                                (liveMatch.showRotation || liveMatch.tvSettings?.showRotationMode)
-                                                    ? "bg-cyan-500/20 text-cyan-300 border border-cyan-400/30"
-                                                    : "bg-white/5 text-slate-400"
-                                            }`}>
-                                                {(() => {
-                                                    if (!liveMatch.showRotation && !liveMatch.tvSettings?.showRotationMode) return "Inactivo";
-                                                    const m = liveMatch.tvSettings?.showRotationMode || "both";
-                                                    if (m === "teamA") return "Solo EQ. A";
-                                                    if (m === "teamB") return "Solo EQ. B";
-                                                    return "Ambos Equipos";
-                                                })()}
-                                            </span>
+                                            {/* Botón principal: presione para activar en TV, presione de nuevo para desactivar */}
+                                            <button
+                                                onClick={() => handleToggleRotationView()}
+                                                className={`px-3 py-1 rounded-lg text-xs font-black uppercase tracking-widest transition shadow-md ${
+                                                    (liveMatch.showRotation || liveMatch.tvSettings?.showRotationMode)
+                                                        ? 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-[0_0_15px_rgba(6,182,212,0.5)] animate-pulse'
+                                                        : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                                                }`}
+                                                title="Presione para activar o desactivar la rotación en la transmisión TV"
+                                            >
+                                                {(liveMatch.showRotation || liveMatch.tvSettings?.showRotationMode) ? 'Activo (En TV)' : 'Inactivo'}
+                                            </button>
                                         </div>
-                                        <div className="grid grid-cols-4 gap-1.5 w-full">
+                                        <div className="grid grid-cols-3 gap-1.5 w-full">
                                             <button
                                                 onClick={() => handleToggleRotationView("both")}
                                                 className={`py-1.5 px-1 rounded-lg text-[10px] font-black uppercase transition-all flex items-center justify-center gap-1 ${
@@ -1717,7 +1724,7 @@ export const App: React.FC = () => {
                                                         ? "bg-cyan-500 text-slate-950 shadow-[0_0_12px_rgba(6,182,212,0.4)]"
                                                         : "bg-white/10 hover:bg-white/20 text-slate-300 border border-white/5"
                                                 }`}
-                                                title="Enviar rotaciones de ambos equipos a TV"
+                                                title="Ambos equipos en TV (clic para activar, clic de nuevo para desactivar)"
                                             >
                                                 👥 Ambos
                                             </button>
@@ -1728,7 +1735,7 @@ export const App: React.FC = () => {
                                                         ? "bg-cyan-600 text-white shadow-[0_0_12px_rgba(6,182,212,0.5)] border border-cyan-400"
                                                         : "bg-white/10 hover:bg-white/20 text-slate-300 border border-white/5"
                                                 }`}
-                                                title="Enviar solo rotación del Equipo A a TV"
+                                                title="Solo Equipo A en TV (clic para activar, clic de nuevo para desactivar)"
                                             >
                                                 🔵 EQ. A
                                             </button>
@@ -1739,20 +1746,9 @@ export const App: React.FC = () => {
                                                         ? "bg-rose-600 text-white shadow-[0_0_12px_rgba(244,63,94,0.5)] border border-rose-400"
                                                         : "bg-white/10 hover:bg-white/20 text-slate-300 border border-white/5"
                                                 }`}
-                                                title="Enviar solo rotación del Equipo B a TV"
+                                                title="Solo Equipo B en TV (clic para activar, clic de nuevo para desactivar)"
                                             >
                                                 🔴 EQ. B
-                                            </button>
-                                            <button
-                                                onClick={() => handleToggleRotationView("off")}
-                                                className={`py-1.5 px-1 rounded-lg text-[10px] font-bold uppercase transition-all flex items-center justify-center gap-1 ${
-                                                    (!liveMatch.showRotation && !liveMatch.tvSettings?.showRotationMode)
-                                                        ? "bg-slate-800 text-slate-500 cursor-default"
-                                                        : "bg-red-500/20 hover:bg-red-500 text-red-300 hover:text-white border border-red-500/30"
-                                                }`}
-                                                title="Ocultar rotación de la pantalla TV"
-                                            >
-                                                ✕ Quitar
                                             </button>
                                         </div>
                                     </div>
@@ -2931,8 +2927,8 @@ export const App: React.FC = () => {
           />
       )}
 
-      {/* ROTATION VIEW OVERLAY */}
-      {liveMatch?.showRotation && ['ADMIN', 'MAIN_REFEREE', 'REFEREE'].includes(currentUser?.role || '') && activeTournament && (() => {
+      {/* LOCAL REFEREE ROTATION MODAL ONLY (Does NOT appear in operator control panel during live TV broadcast) */}
+      {showRefereeRotationModal && currentUser?.role === 'REFEREE' && activeTournament && liveMatch && (() => {
           const fixture = activeTournament.fixtures?.find(f => f.id === liveMatch.matchId);
           const tA = activeTournament.teams.find(t => t.id === fixture?.teamAId);
           const tB = activeTournament.teams.find(t => t.id === fixture?.teamBId);
@@ -2946,8 +2942,7 @@ export const App: React.FC = () => {
               rotationB={liveMatch.rotationB}
               servingTeamId={liveMatch.servingTeamId}
               initialTab={liveMatch.tvSettings?.showRotationMode || 'both'}
-              onTabChange={(tab) => handleToggleRotationView(tab)}
-              onClose={() => handleToggleRotationView('off')}
+              onClose={() => setShowRefereeRotationModal(false)}
             />
           );
       })()}
